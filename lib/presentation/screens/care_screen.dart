@@ -12,6 +12,21 @@ class CareScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const recommendations = [
+      (
+        title: 'Hydration',
+        body: 'Drink water and recheck your oxygen level after resting.',
+      ),
+      (
+        title: 'Recovery',
+        body: 'Avoid high exertion until heart rate settles near baseline.',
+      ),
+      (
+        title: 'Breathing',
+        body: 'Use slow deep breathing for two minutes after an SpO2 dip.',
+      ),
+    ];
+
     return ScreenScaffold(
       title: 'Care',
       body: Column(
@@ -22,16 +37,15 @@ class CareScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _RecommendationTile(
-                  title: 'Hydration',
-                  body:
-                      'Drink water and recheck your oxygen level after resting.',
-                ),
-                const SizedBox(height: 12),
-                _RecommendationTile(
-                  title: 'Recovery',
-                  body:
-                      'Avoid high exertion until heart rate settles near baseline.',
+                ...recommendations.indexed.expand(
+                  (entry) => [
+                    _RecommendationTile(
+                      title: entry.$2.title,
+                      body: entry.$2.body,
+                    ),
+                    if (entry.$1 != recommendations.length - 1)
+                      const SizedBox(height: 12),
+                  ],
                 ),
               ],
             ),
@@ -60,6 +74,26 @@ class CareScreen extends StatelessWidget {
                     ),
                   )
                   .toList(growable: false),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const _SectionCard(
+            title: 'Precautions',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _PrecautionLine(
+                  text: 'Avoid long gaps between meals when activity is high.',
+                ),
+                SizedBox(height: 10),
+                _PrecautionLine(
+                  text: 'Keep your wearable charged before bedtime tracking.',
+                ),
+                SizedBox(height: 10),
+                _PrecautionLine(
+                  text: 'Review unusual readings again before acting on them.',
+                ),
+              ],
             ),
           ),
         ],
@@ -114,7 +148,7 @@ class _SectionCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.card(context),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
       ),
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -132,6 +166,37 @@ class _SectionCard extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+}
+
+class _PrecautionLine extends StatelessWidget {
+  const _PrecautionLine({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          margin: const EdgeInsets.only(top: 5),
+          decoration: const BoxDecoration(
+            color: AppColors.amber,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(color: AppColors.secondaryText(context)),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -76,10 +76,11 @@ class DashboardScreen extends StatelessWidget {
           Container(
             decoration: BoxDecoration(
               color: cardColor,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(24),
             ),
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Column(
@@ -89,11 +90,11 @@ class DashboardScreen extends StatelessWidget {
                         'Today\'s summary',
                         style: TextStyle(
                           color: textColor,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w500,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       RichText(
                         text: TextSpan(
                           style: TextStyle(color: textColor, fontSize: 14),
@@ -103,23 +104,22 @@ class DashboardScreen extends StatelessWidget {
                               text: snapshot.overallStatus,
                               style: TextStyle(
                                 color: summaryBadgeColor,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Text(
                         snapshot.summary,
-                        style: TextStyle(color: secondaryText),
+                        style: TextStyle(color: secondaryText, height: 1.35),
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 4),
                       Text(
                         'Activity: ${snapshot.activityLabel}',
                         style: TextStyle(color: secondaryText),
                       ),
-                      const SizedBox(height: 6),
                       Text(
                         'Last updated: ${formatShortDateTime(snapshot.timestamp)}',
                         style: TextStyle(color: secondaryText, fontSize: 12),
@@ -127,14 +127,14 @@ class DashboardScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Container(
                   width: 96,
                   height: 96,
                   decoration: BoxDecoration(
                     color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white.withValues(alpha: 0.16)
-                        : AppColors.teal.withValues(alpha: 0.14),
+                        ? Colors.white.withValues(alpha: 0.12)
+                        : AppColors.cream,
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
@@ -145,8 +145,8 @@ class DashboardScreen extends StatelessWidget {
                         '$score',
                         style: TextStyle(
                           color: textColor,
-                          fontSize: 36,
-                          fontWeight: FontWeight.w400,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       Text(
@@ -165,7 +165,7 @@ class DashboardScreen extends StatelessWidget {
             style: TextStyle(
               color: textColor,
               fontSize: 20,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 16),
@@ -194,7 +194,7 @@ class DashboardScreen extends StatelessWidget {
               MetricCard(
                 title: 'Body Temperature',
                 value: snapshot.bodyTempC.toStringAsFixed(1),
-                unit: '°',
+                unit: '°C',
                 footer: 'Status: Normal',
                 color: AppColors.teal,
               ),
@@ -211,9 +211,9 @@ class DashboardScreen extends StatelessWidget {
           Container(
             decoration: BoxDecoration(
               color: cardColor,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(24),
             ),
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
             child: Column(
               children: [
                 Row(
@@ -224,7 +224,7 @@ class DashboardScreen extends StatelessWidget {
                         style: TextStyle(
                           color: textColor,
                           fontSize: 20,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -261,13 +261,13 @@ class _AlertTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final background = Theme.of(context).brightness == Brightness.dark
-        ? const Color(0xFF5B5B5B)
+        ? const Color(0xFF4A515A)
         : const Color(0xFFF1F5F9);
 
     return Container(
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(14),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
@@ -278,7 +278,7 @@ class _AlertTile extends StatelessWidget {
             style: TextStyle(
               color: AppColors.primaryText(context),
               fontSize: 16,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 4),
@@ -287,6 +287,14 @@ class _AlertTile extends StatelessWidget {
             style: TextStyle(
               color: AppColors.secondaryText(context),
               fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            alert.category,
+            style: TextStyle(
+              color: AppColors.secondaryText(context),
+              fontSize: 11,
             ),
           ),
         ],

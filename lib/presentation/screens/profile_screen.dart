@@ -14,52 +14,36 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final device = controller.deviceProfile;
     return ScreenScaffold(
       title: 'Profile',
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             decoration: BoxDecoration(
               color: AppColors.card(context),
               borderRadius: BorderRadius.circular(20),
             ),
-            padding: const EdgeInsets.all(18),
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                CircleAvatar(
-                  radius: 38,
+                _ProfileBubble(
+                  icon: Icons.person_outline,
+                  label: 'User',
                   backgroundColor:
                       Theme.of(context).brightness == Brightness.dark
                       ? Colors.white10
                       : const Color(0xFFE2E8F0),
-                  child: Icon(
-                    Icons.person_outline,
-                    size: 38,
-                    color: AppColors.primaryText(context),
-                  ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        controller.userProfile.name,
-                        style: TextStyle(
-                          color: AppColors.primaryText(context),
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Your profile',
-                        style: TextStyle(
-                          color: AppColors.secondaryText(context),
-                        ),
-                      ),
-                    ],
-                  ),
+                _ProfileBubble(
+                  icon: Icons.watch_outlined,
+                  label: device.connectionMode,
+                  backgroundColor:
+                      Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white10
+                      : const Color(0xFFE2E8F0),
                 ),
               ],
             ),
@@ -83,6 +67,22 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          Material(
+            color: AppColors.card(context),
+            borderRadius: BorderRadius.circular(18),
+            child: SwitchListTile(
+              value: controller.settings.darkMode,
+              onChanged: controller.updateTheme,
+              title: Text(
+                'Dark mode',
+                style: TextStyle(
+                  color: AppColors.primaryText(context),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           _MenuTile(
             title: 'Settings',
             onTap: () => Navigator.of(context).push(
@@ -91,8 +91,53 @@ class ProfileScreen extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.tonal(
+              onPressed: controller.signOut,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text('Logout'),
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _ProfileBubble extends StatelessWidget {
+  const _ProfileBubble({
+    required this.icon,
+    required this.label,
+    required this.backgroundColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        CircleAvatar(
+          radius: 48,
+          backgroundColor: backgroundColor,
+          child: Icon(icon, size: 42, color: AppColors.primaryText(context)),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          label,
+          style: TextStyle(
+            color: AppColors.secondaryText(context),
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
     );
   }
 }

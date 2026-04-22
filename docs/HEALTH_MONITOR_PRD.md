@@ -1,6 +1,6 @@
 # Health Monitor App PRD and Implementation Tracker
 
-Last updated: 2026-04-12 (post first implementation pass)
+Last updated: 2026-04-21 (post entry/dashboard polish pass)
 Workspace: `D:\Anurag\b.tech\final_year_project\health_monitor_app`
 Platform target: Android first
 Design source: Figma file `fwah5GHCMm6di3x6wocqgQ`, page `4:2`
@@ -198,22 +198,38 @@ The app should be organized into:
   - `Device`
   - `Settings`
   - `Alerts & Notifications`
+- Entry flow pass completed:
+  - `Onboarding`
+  - `Sign in / Sign up`
+  - `Device Pairing`
+  - app root entry gating based on persisted state
+  - logout path back into auth flow
 - Android notification manifest updated for local notifications
 - Code formatting completed with `dart format`
 - Validation completed:
   - `flutter analyze` passed
   - `flutter test` passed
+- Profile-side polish pass completed:
+  - `Profile` layout refined
+  - `User profile` layout refined
+  - `Device` layout refined
+  - `Settings` layout refined
+- Entry/dashboard polish pass completed:
+  - `Auth` now includes a Figma-style welcome entry plus separate sign-in/sign-up states
+  - `Onboarding` hero card and controls refined toward the Figma layout
+  - `Device Pairing` split into a more design-faithful choose-method and choose-device flow
+  - `Dashboard` summary and alerts card refined
+  - `Reports` and `Care` layouts refined
+  - validation re-run after polish:
+    - `flutter analyze` passed
+    - `flutter test` passed
 
 ### In progress
 
-- Improving visual fidelity against Figma beyond the first functional pass
-- Expanding the app to include onboarding, sign in/sign up, and device pairing screens from the design
+- Improving visual fidelity against Figma beyond the current functional pass
 
 ### Not started yet
 
-- Onboarding flow implementation
-- Sign in / Sign up flow implementation
-- Device pairing flow implementation
 - Light/dark design parity refinement for every screen
 - Manual Figma-by-Figma screen matching pass
 - AWS integration
@@ -297,9 +313,9 @@ Use this section as the running progress tracker.
 - [x] Implement Device
 - [x] Implement Settings
 - [x] Implement Alerts and Notifications
-- [ ] Implement Onboarding
-- [ ] Implement Sign in / Sign up
-- [ ] Implement Device Pairing
+- [x] Implement Onboarding
+- [x] Implement Sign in / Sign up
+- [x] Implement Device Pairing
 - [ ] Refine visual fidelity to Figma across all screens
 
 ### Platform and persistence
@@ -332,6 +348,21 @@ Use this section as the running progress tracker.
 - The current state is a functional mock-data-first phase-1 build with validation already passing
 - The next pass should focus on design fidelity and the pre-auth / pairing flows missing from the current codebase
 
+### 2026-04-21
+
+- The app now starts with a persisted first-launch flow:
+  - onboarding
+  - auth
+  - device pairing
+  - main app shell
+- `AppSettings` now stores onboarding, sign-in, and pairing completion flags
+- Validation re-run after the entry flow pass:
+  - `flutter analyze` passed
+  - `flutter test` passed
+- The next major work should shift from missing flows to Figma fidelity and visual refinement
+- A first polish pass has now been applied to the profile-side screens while keeping validation green
+- A second polish pass has now been applied to onboarding/auth/device pairing plus dashboard/reports/care while keeping validation green
+
 ## 11. Session Resume Instructions
 
 If a future Codex session needs to continue the work, use this checklist:
@@ -351,11 +382,9 @@ If a future Codex session needs to continue the work, use this checklist:
 
 The next implementation step should be:
 
-- implement the missing Figma flows:
-  - onboarding
-  - sign in / sign up
-  - device pairing
-- then do a visual refinement pass on the existing phase-1 screens so spacing, colors, cards, and typography match Figma more closely
+- do a visual refinement pass on the existing screens so spacing, colors, cards, and typography match Figma more closely
+- improve light and dark parity across the full app flow
+- manually compare implemented screens against the Figma file section-by-section and tighten any remaining mismatches
 - after that, re-run:
   - `flutter analyze`
   - `flutter test`

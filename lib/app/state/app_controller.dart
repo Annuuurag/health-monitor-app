@@ -169,6 +169,35 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> completeOnboarding() async {
+    _settings = _settings.copyWith(hasCompletedOnboarding: true);
+    await profileRepository.saveSettings(_settings);
+    notifyListeners();
+  }
+
+  Future<void> signIn() async {
+    _settings = _settings.copyWith(isSignedIn: true);
+    await profileRepository.saveSettings(_settings);
+    notifyListeners();
+  }
+
+  Future<void> signOut() async {
+    _settings = _settings.copyWith(isSignedIn: false);
+    await profileRepository.saveSettings(_settings);
+    notifyListeners();
+  }
+
+  Future<void> completePairing(String connectionMode) async {
+    _settings = _settings.copyWith(hasCompletedPairing: true);
+    _deviceProfile = _deviceProfile.copyWith(
+      connectionMode: connectionMode,
+      lastSyncedAt: DateTime.now(),
+    );
+    await profileRepository.saveSettings(_settings);
+    await deviceRepository.saveDeviceProfile(_deviceProfile);
+    notifyListeners();
+  }
+
   Future<void> toggleReminder(String reminderId, bool enabled) async {
     _reminders = _reminders
         .map(

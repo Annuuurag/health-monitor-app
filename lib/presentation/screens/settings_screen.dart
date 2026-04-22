@@ -15,24 +15,50 @@ class SettingsScreen extends StatelessWidget {
       title: 'Settings',
       body: Column(
         children: [
+          _ActionTile(
+            title: 'Delete Account',
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Delete account flow is not enabled in demo mode.',
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
           _SettingSwitchTile(
             title: 'Push Notification',
             value: controller.settings.notificationsEnabled,
             onChanged: controller.updateNotifications,
           ),
-          const SizedBox(height: 12),
-          _SettingSwitchTile(
-            title: 'Dark mode',
-            value: controller.settings.darkMode,
-            onChanged: controller.updateTheme,
-          ),
-          const SizedBox(height: 12),
-          _SettingSwitchTile(
-            title: 'Privacy mode',
-            value: controller.settings.privacyMode,
-            onChanged: controller.updatePrivacyMode,
-          ),
         ],
+      ),
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({required this.title, required this.onTap});
+
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.card(context),
+      borderRadius: BorderRadius.circular(18),
+      child: ListTile(
+        onTap: onTap,
+        title: Text(
+          title,
+          style: TextStyle(
+            color: AppColors.primaryText(context),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ),
     );
   }

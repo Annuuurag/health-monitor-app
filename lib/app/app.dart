@@ -9,7 +9,7 @@ import '../data/mock/mock_reminders_repository.dart';
 import '../data/mock/mock_reports_repository.dart';
 import '../data/mock/mock_telemetry_repository.dart';
 import '../presentation/screens/alerts_screen.dart';
-import '../presentation/screens/app_shell.dart';
+import '../presentation/screens/entry_gate_screen.dart';
 import '../services/notification_service.dart';
 import 'state/app_controller.dart';
 import 'theme/app_theme.dart';
@@ -61,7 +61,7 @@ class _HealthMonitorAppState extends State<HealthMonitorApp> {
             AlertsScreen.routeName: (context) =>
                 AlertsScreen(controller: widget.controller),
           },
-          home: AppShell(controller: widget.controller),
+          home: EntryGateScreen(controller: widget.controller),
         );
       },
     );

@@ -9,10 +9,7 @@ import 'profile_screen.dart';
 import 'reports_screen.dart';
 
 class AppShell extends StatelessWidget {
-  const AppShell({
-    super.key,
-    required this.controller,
-  });
+  const AppShell({super.key, required this.controller});
 
   final AppController controller;
 

@@ -8,7 +8,10 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('renders the dashboard shell', (WidgetTester tester) async {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      'app_settings':
+          '{"notificationsEnabled":true,"darkMode":false,"privacyMode":false,"hasCompletedOnboarding":true,"isSignedIn":true,"hasCompletedPairing":true}',
+    });
 
     final controller = createAppController(
       notificationService: NoopNotificationService(),

@@ -51,36 +51,116 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final profile = widget.controller.userProfile;
     return ScreenScaffold(
       title: 'User profile',
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          _field('Name', _nameController),
-          _field('Age', _ageController, keyboardType: TextInputType.number),
-          _field('Gender', _genderController),
-          _field(
-            'Height',
-            _heightController,
-            keyboardType: TextInputType.number,
+          Stack(
+            children: [
+              CircleAvatar(
+                radius: 88,
+                backgroundColor: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white10
+                    : const Color(0xFFE2E8F0),
+                child: Icon(
+                  Icons.person_outline,
+                  size: 90,
+                  color: AppColors.primaryText(context),
+                ),
+              ),
+              Positioned(
+                right: 6,
+                bottom: 6,
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: const BoxDecoration(
+                    color: AppColors.teal,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.edit, color: Colors.white, size: 18),
+                ),
+              ),
+            ],
           ),
-          _field(
-            'Weight',
-            _weightController,
-            keyboardType: TextInputType.number,
+          const SizedBox(height: 18),
+          Text(
+            profile.name,
+            style: TextStyle(
+              color: AppColors.primaryText(context),
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          _field(
-            'Phone',
-            _contactController,
-            keyboardType: TextInputType.phone,
+          const SizedBox(height: 18),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.card(context),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Your details',
+                        style: TextStyle(
+                          color: AppColors.primaryText(context),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      'Edit',
+                      style: TextStyle(
+                        color: AppColors.teal,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _field('Name', _nameController),
+                _field(
+                  'Age',
+                  _ageController,
+                  keyboardType: TextInputType.number,
+                ),
+                _field('Gender', _genderController),
+                _field(
+                  'Height',
+                  _heightController,
+                  keyboardType: TextInputType.number,
+                ),
+                _field(
+                  'Weight',
+                  _weightController,
+                  keyboardType: TextInputType.number,
+                ),
+                _field(
+                  'Phone',
+                  _contactController,
+                  keyboardType: TextInputType.phone,
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
+          Align(
+            alignment: Alignment.centerRight,
             child: FilledButton(
               onPressed: _save,
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.teal,
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 28,
+                  vertical: 14,
+                ),
               ),
               child: const Text('Save'),
             ),
@@ -96,11 +176,33 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     TextInputType? keyboardType,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        decoration: InputDecoration(labelText: label),
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 78,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: AppColors.primaryText(context),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              keyboardType: keyboardType,
+              decoration: const InputDecoration(
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
