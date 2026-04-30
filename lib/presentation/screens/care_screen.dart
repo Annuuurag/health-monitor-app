@@ -4,6 +4,7 @@ import '../../app/state/app_controller.dart';
 import '../../core/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/screen_scaffold.dart';
+import '../widgets/reminder_dialog.dart';
 
 class CareScreen extends StatelessWidget {
   const CareScreen({super.key, required this.controller});
@@ -53,28 +54,71 @@ class CareScreen extends StatelessWidget {
           const SizedBox(height: 16),
           _SectionCard(
             title: 'Medication reminders',
-            child: Column(
-              children: controller.reminders
-                  .map(
-                    (reminder) => SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      value: reminder.enabled,
-                      onChanged: (value) =>
-                          controller.toggleReminder(reminder.id, value),
-                      title: Text(
-                        reminder.title,
-                        style: TextStyle(color: AppColors.primaryText(context)),
-                      ),
-                      subtitle: Text(
-                        '${reminder.dosage} • ${formatTimeOfDay(TimeOfDay(hour: reminder.hour, minute: reminder.minute))}',
-                        style: TextStyle(
-                          color: AppColors.secondaryText(context),
-                        ),
-                      ),
+            trailing: IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              icon: const Icon(Icons.add_circle_outline, color: AppColors.teal),
+              onPressed: () async {
+                final newReminder = await ReminderDialog.show(context);
+                if (newReminder != null) {
+                  controller.addReminder(newReminder);
+                }
+              },
+            ),
+            child: controller.reminders.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Text(
+                      'No reminders set. Tap the + icon to add one.',
+                      style: TextStyle(color: AppColors.secondaryText(context)),
                     ),
                   )
-                  .toList(growable: false),
-            ),
+                : Column(
+                    children: controller.reminders
+                        .map(
+                          (reminder) => Dismissible(
+                            key: ValueKey(reminder.id),
+                            direction: DismissDirection.endToStart,
+                            background: Container(
+                              alignment: Alignment.centerRight,
+                              padding: const EdgeInsets.only(right: 20),
+                              color: Colors.red.shade400,
+                              child: const Icon(Icons.delete, color: Colors.white),
+                            ),
+                            onDismissed: (_) =>
+                                controller.removeReminder(reminder.id),
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                reminder.title,
+                                style: TextStyle(color: AppColors.primaryText(context)),
+                              ),
+                              subtitle: Text(
+                                '${reminder.dosage} • ${formatTimeOfDay(TimeOfDay(hour: reminder.hour, minute: reminder.minute))}',
+                                style: TextStyle(
+                                  color: AppColors.secondaryText(context),
+                                ),
+                              ),
+                              trailing: Switch(
+                                value: reminder.enabled,
+                                onChanged: (value) =>
+                                    controller.toggleReminder(reminder.id, value),
+                                activeThumbColor: AppColors.teal,
+                              ),
+                              onTap: () async {
+                                final updated = await ReminderDialog.show(
+                                  context,
+                                  reminder: reminder,
+                                );
+                                if (updated != null) {
+                                  controller.updateReminder(updated);
+                                }
+                              },
+                            ),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
           ),
           const SizedBox(height: 16),
           const _SectionCard(
@@ -138,10 +182,11 @@ class _RecommendationTile extends StatelessWidget {
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({required this.title, required this.child});
+  const _SectionCard({required this.title, required this.child, this.trailing});
 
   final String title;
   final Widget child;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -154,13 +199,19 @@ class _SectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: AppColors.primaryText(context),
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  color: AppColors.primaryText(context),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              ?trailing,
+            ],
           ),
           const SizedBox(height: 14),
           child,

@@ -77,17 +77,23 @@ class ReportsScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: controller.reports
-                .map(
-                  (report) => _ReportChip(
-                    label: report.periodLabel,
-                    value: '${report.activeMinutes} min',
-                  ),
-                )
-                .toList(growable: false),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final chipWidth = (constraints.maxWidth - 15) / 2;
+              return Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: controller.reports
+                    .map(
+                      (report) => _ReportChip(
+                        label: report.periodLabel,
+                        value: '${report.activeMinutes} min',
+                        width: chipWidth,
+                      ),
+                    )
+                    .toList(growable: false),
+              );
+            },
           ),
           const SizedBox(height: 18),
           ...controller.reports.map(
@@ -116,29 +122,38 @@ class ReportsScreen extends StatelessWidget {
                       style: TextStyle(color: secondary),
                     ),
                     const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        _ReportChip(
-                          label: 'Heart rate',
-                          value:
-                              '${report.averageHeartRate.toStringAsFixed(1)} BPM',
-                        ),
-                        _ReportChip(
-                          label: 'SpO2',
-                          value: '${report.averageSpo2.toStringAsFixed(1)} %',
-                        ),
-                        _ReportChip(
-                          label: 'Temp',
-                          value:
-                              '${report.averageTemperature.toStringAsFixed(1)} °C',
-                        ),
-                        _ReportChip(
-                          label: 'Active',
-                          value: '${report.activeMinutes} min',
-                        ),
-                      ],
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final chipWidth = (constraints.maxWidth - 15) / 2;
+                        return Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            _ReportChip(
+                              label: 'Heart rate',
+                              value:
+                                  '${report.averageHeartRate.toStringAsFixed(1)} BPM',
+                              width: chipWidth,
+                            ),
+                            _ReportChip(
+                              label: 'SpO2',
+                              value: '${report.averageSpo2.toStringAsFixed(1)} %',
+                              width: chipWidth,
+                            ),
+                            _ReportChip(
+                              label: 'Temp',
+                              value:
+                                  '${report.averageTemperature.toStringAsFixed(1)} °C',
+                              width: chipWidth,
+                            ),
+                            _ReportChip(
+                              label: 'Active',
+                              value: '${report.activeMinutes} min',
+                              width: chipWidth,
+                            ),
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 14),
                     Text(report.note, style: TextStyle(color: secondary)),
@@ -178,15 +193,16 @@ class _TrendBar extends StatelessWidget {
 }
 
 class _ReportChip extends StatelessWidget {
-  const _ReportChip({required this.label, required this.value});
+  const _ReportChip({required this.label, required this.value, this.width});
 
   final String label;
   final String value;
+  final double? width;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 155,
+      width: width ?? 155,
       decoration: BoxDecoration(
         color: Theme.of(context).brightness == Brightness.dark
             ? Colors.white.withValues(alpha: 0.04)

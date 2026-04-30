@@ -211,11 +211,27 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateReminderTime(String reminderId, TimeOfDay time) async {
+  Future<void> addReminder(MedicationReminder reminder) async {
+    _reminders = [..._reminders, reminder];
+    await remindersRepository.saveReminders(_reminders);
+    await _syncReminderNotifications();
+    notifyListeners();
+  }
+
+  Future<void> removeReminder(String reminderId) async {
+    _reminders = _reminders
+        .where((reminder) => reminder.id != reminderId)
+        .toList(growable: false);
+    await remindersRepository.saveReminders(_reminders);
+    await _syncReminderNotifications();
+    notifyListeners();
+  }
+
+  Future<void> updateReminder(MedicationReminder updatedReminder) async {
     _reminders = _reminders
         .map(
-          (reminder) => reminder.id == reminderId
-              ? reminder.copyWith(hour: time.hour, minute: time.minute)
+          (reminder) => reminder.id == updatedReminder.id
+              ? updatedReminder
               : reminder,
         )
         .toList(growable: false);

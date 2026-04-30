@@ -189,38 +189,41 @@ class _DevicePairingFlowScreenState extends State<DevicePairingFlowScreen> {
                               ),
                             ),
                             const SizedBox(height: 14),
-                            ...List.generate(
-                              5,
-                              (index) => Container(
-                                margin: const EdgeInsets.only(bottom: 10),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF4F1FD),
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 16,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      _selectedMethod!.icon,
-                                      color: AppColors.teal,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        '${_selectedMethod!.devicePrefix} ${index + 1}',
-                                        style: const TextStyle(
-                                          color: AppColors.darkBackground,
+                            Expanded(
+                              child: ListView.builder(
+                                itemCount: 5,
+                                padding: EdgeInsets.zero,
+                                itemBuilder: (context, index) => Container(
+                                  margin: const EdgeInsets.only(bottom: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF4F1FD),
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 16,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        _selectedMethod!.icon,
+                                        color: AppColors.teal,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          '${_selectedMethod!.devicePrefix} ${index + 1}',
+                                          style: const TextStyle(
+                                            color: AppColors.darkBackground,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
-                            const Spacer(),
+                            const SizedBox(height: 14),
                             Row(
                               children: [
                                 OutlinedButton(

@@ -316,6 +316,8 @@ Use this section as the running progress tracker.
 - [x] Implement Onboarding
 - [x] Implement Sign in / Sign up
 - [x] Implement Device Pairing
+- [x] Implement dynamic user-configurable reminders in Care screen
+- [x] Add Add/Edit Reminder dialog
 - [ ] Refine visual fidelity to Figma across all screens
 
 ### Platform and persistence
@@ -363,6 +365,11 @@ Use this section as the running progress tracker.
 - A first polish pass has now been applied to the profile-side screens while keeping validation green
 - A second polish pass has now been applied to onboarding/auth/device pairing plus dashboard/reports/care while keeping validation green
 
+### 2026-04-30
+
+- Changed medication reminders from fixed/hardcoded times to a dynamic, user-configurable alarm system. This fixes timezone localization issues and improves the user experience.
+
+
 ## 11. Session Resume Instructions
 
 If a future Codex session needs to continue the work, use this checklist:
@@ -382,7 +389,7 @@ If a future Codex session needs to continue the work, use this checklist:
 
 The next implementation step should be:
 
-- do a visual refinement pass on the existing screens so spacing, colors, cards, and typography match Figma more closely
+- Do a visual refinement pass on the existing screens so spacing, colors, cards, and typography match Figma more closely
 - improve light and dark parity across the full app flow
 - manually compare implemented screens against the Figma file section-by-section and tighten any remaining mismatches
 - after that, re-run:

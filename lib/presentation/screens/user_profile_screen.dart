@@ -21,6 +21,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   late final TextEditingController _heightController;
   late final TextEditingController _weightController;
   late final TextEditingController _contactController;
+  bool _isEditing = false;
 
   @override
   void initState() {
@@ -115,11 +116,28 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         ),
                       ),
                     ),
-                    Text(
-                      'Edit',
-                      style: TextStyle(
-                        color: AppColors.teal,
-                        fontWeight: FontWeight.w600,
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          if (_isEditing) {
+                            // Revert changes if cancelled
+                            final profile = widget.controller.userProfile;
+                            _nameController.text = profile.name;
+                            _ageController.text = profile.age.toString();
+                            _genderController.text = profile.gender;
+                            _heightController.text = profile.heightCm.toString();
+                            _weightController.text = profile.weightKg.toString();
+                            _contactController.text = profile.emergencyContact;
+                          }
+                          _isEditing = !_isEditing;
+                        });
+                      },
+                      child: Text(
+                        _isEditing ? 'Cancel' : 'Edit',
+                        style: TextStyle(
+                          color: AppColors.teal,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -151,20 +169,21 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton(
-              onPressed: _save,
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.teal,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 28,
-                  vertical: 14,
+          if (_isEditing)
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton(
+                onPressed: _save,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.teal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 14,
+                  ),
                 ),
+                child: const Text('Save'),
               ),
-              child: const Text('Save'),
             ),
-          ),
         ],
       ),
     );
@@ -191,6 +210,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ),
           Expanded(
             child: TextField(
+              enabled: _isEditing,
               controller: controller,
               keyboardType: keyboardType,
               decoration: const InputDecoration(
@@ -227,6 +247,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     if (!mounted) {
       return;
     }
+    setState(() {
+      _isEditing = false;
+    });
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Profile updated')));

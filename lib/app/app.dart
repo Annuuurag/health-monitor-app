@@ -54,9 +54,11 @@ class _HealthMonitorAppState extends State<HealthMonitorApp> {
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme(),
           darkTheme: AppTheme.darkTheme(),
-          themeMode: widget.controller.settings.darkMode
-              ? ThemeMode.dark
-              : ThemeMode.light,
+          themeMode: !widget.controller.settings.isSignedIn
+              ? ThemeMode.light
+              : (widget.controller.settings.darkMode
+                  ? ThemeMode.dark
+                  : ThemeMode.light),
           routes: {
             AlertsScreen.routeName: (context) =>
                 AlertsScreen(controller: widget.controller),

@@ -265,6 +265,7 @@ class _AlertTile extends StatelessWidget {
         : const Color(0xFFF1F5F9);
 
     return Container(
+      width: double.infinity,
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(14),
