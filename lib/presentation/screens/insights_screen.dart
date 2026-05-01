@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/state/app_controller.dart';
+import '../../app/theme/app_theme.dart';
 import '../../core/app_colors.dart';
 import '../../core/widgets/screen_scaffold.dart';
 import '../../domain/models/insight_result.dart';
@@ -42,10 +43,7 @@ class _InsightCard extends StatelessWidget {
     };
 
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.card(context),
-        borderRadius: BorderRadius.circular(20),
-      ),
+      decoration: AppTheme.cardDecoration(context),
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

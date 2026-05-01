@@ -40,7 +40,7 @@ class AppColors {
 
   static Color navigationBackground(BuildContext context) {
     return Theme.of(context).brightness == Brightness.dark
-        ? cream
-        : Colors.white;
+        ? darkCard
+        : cream;
   }
 }

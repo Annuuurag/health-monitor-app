@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/state/app_controller.dart';
+import '../../app/theme/app_theme.dart';
 import '../../core/app_colors.dart';
 import '../../core/widgets/screen_scaffold.dart';
 import 'device_screen.dart';
@@ -21,10 +22,7 @@ class ProfileScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            decoration: BoxDecoration(
-              color: AppColors.card(context),
-              borderRadius: BorderRadius.circular(20),
-            ),
+            decoration: AppTheme.cardDecoration(context),
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

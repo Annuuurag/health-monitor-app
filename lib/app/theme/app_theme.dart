@@ -1,10 +1,27 @@
 import 'package:flutter/material.dart';
-
+import 'package:google_fonts/google_fonts.dart';
 import '../../core/app_colors.dart';
 
 class AppTheme {
   static const _seed = AppColors.teal;
   static const _accent = AppColors.amber;
+
+  static BoxDecoration cardDecoration(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return BoxDecoration(
+      color: AppColors.card(context),
+      borderRadius: BorderRadius.circular(24),
+      boxShadow: isDark
+          ? null
+          : [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+    );
+  }
 
   static ThemeData lightTheme() {
     final scheme = ColorScheme.fromSeed(
@@ -19,7 +36,7 @@ class AppTheme {
       colorScheme: scheme,
       useMaterial3: true,
       scaffoldBackgroundColor: AppColors.lightBackground,
-      fontFamily: 'sans-serif',
+      textTheme: GoogleFonts.inderTextTheme(ThemeData.light().textTheme),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -82,7 +99,7 @@ class AppTheme {
       colorScheme: scheme,
       useMaterial3: true,
       scaffoldBackgroundColor: AppColors.darkBackground,
-      fontFamily: 'sans-serif',
+      textTheme: GoogleFonts.inderTextTheme(ThemeData.dark().textTheme),
       appBarTheme: const AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,

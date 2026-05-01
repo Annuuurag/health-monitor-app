@@ -76,8 +76,6 @@ class _ReminderDialogState extends State<ReminderDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     return AlertDialog(
       backgroundColor: AppColors.card(context),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -100,7 +98,7 @@ class _ReminderDialogState extends State<ReminderDialog> {
                 labelText: 'Title / Reason',
                 labelStyle: TextStyle(color: AppColors.secondaryText(context)),
                 enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: AppColors.secondaryText(context).withOpacity(0.3)),
+                  borderSide: BorderSide(color: AppColors.secondaryText(context).withValues(alpha: 0.3)),
                 ),
                 focusedBorder: const UnderlineInputBorder(
                   borderSide: BorderSide(color: AppColors.teal),
@@ -116,7 +114,7 @@ class _ReminderDialogState extends State<ReminderDialog> {
                 labelText: 'Dosage or Additional Info',
                 labelStyle: TextStyle(color: AppColors.secondaryText(context)),
                 enabledBorder: UnderlineInputBorder(
-                  borderSide: BorderSide(color: AppColors.secondaryText(context).withOpacity(0.3)),
+                  borderSide: BorderSide(color: AppColors.secondaryText(context).withValues(alpha: 0.3)),
                 ),
                 focusedBorder: const UnderlineInputBorder(
                   borderSide: BorderSide(color: AppColors.teal),

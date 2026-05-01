@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/state/app_controller.dart';
+import '../../app/theme/app_theme.dart';
 import '../../core/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/metric_card.dart';
@@ -74,10 +75,7 @@ class DashboardScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(24),
-            ),
+            decoration: AppTheme.cardDecoration(context),
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,10 +207,7 @@ class DashboardScreen extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           Container(
-            decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(24),
-            ),
+            decoration: AppTheme.cardDecoration(context),
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
             child: Column(
               children: [

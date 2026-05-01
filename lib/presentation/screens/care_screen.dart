@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/state/app_controller.dart';
+import '../../app/theme/app_theme.dart';
 import '../../core/app_colors.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/screen_scaffold.dart';
@@ -191,10 +192,7 @@ class _SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.card(context),
-        borderRadius: BorderRadius.circular(24),
-      ),
+      decoration: AppTheme.cardDecoration(context),
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

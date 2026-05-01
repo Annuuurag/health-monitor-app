@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/state/app_controller.dart';
+import '../../app/theme/app_theme.dart';
 import '../../core/app_colors.dart';
 import '../../core/widgets/screen_scaffold.dart';
 
@@ -20,10 +21,7 @@ class ReportsScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            decoration: BoxDecoration(
-              color: AppColors.card(context),
-              borderRadius: BorderRadius.circular(24),
-            ),
+            decoration: AppTheme.cardDecoration(context),
             padding: const EdgeInsets.all(18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,10 +98,7 @@ class ReportsScreen extends StatelessWidget {
             (report) => Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.card(context),
-                  borderRadius: BorderRadius.circular(24),
-                ),
+                decoration: AppTheme.cardDecoration(context),
                 padding: const EdgeInsets.all(18),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
