@@ -24,7 +24,23 @@ class LocalNotificationService implements NotificationService {
       final timeZoneName = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(timeZoneName));
     } catch (_) {
-      tz.setLocalLocation(tz.UTC);
+      try {
+        final offset = DateTime.now().timeZoneOffset;
+        tz.Location? fallbackLocation;
+        for (final loc in tz.timeZoneDatabase.locations.values) {
+          if (tz.TZDateTime.now(loc).timeZoneOffset == offset) {
+            fallbackLocation = loc;
+            break;
+          }
+        }
+        if (fallbackLocation != null) {
+          tz.setLocalLocation(fallbackLocation);
+        } else {
+          tz.setLocalLocation(tz.UTC);
+        }
+      } catch (e) {
+        tz.setLocalLocation(tz.UTC);
+      }
     }
 
     const androidSettings = AndroidInitializationSettings(

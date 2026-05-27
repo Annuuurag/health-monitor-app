@@ -29,7 +29,6 @@ class DashboardScreen extends StatelessWidget {
 
     final textColor = AppColors.primaryText(context);
     final secondaryText = AppColors.secondaryText(context);
-    final cardColor = AppColors.card(context);
     final summaryBadgeColor = snapshot.isAnomaly
         ? AppColors.amber
         : AppColors.success;
