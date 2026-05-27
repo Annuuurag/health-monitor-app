@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../app/state/app_controller.dart';
@@ -25,16 +27,18 @@ class ProfileScreen extends StatelessWidget {
             decoration: AppTheme.cardDecoration(context),
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _ProfileBubble(
                   icon: Icons.person_outline,
                   label: 'User',
+                  imagePath: controller.userProfile.profileImagePath,
                   backgroundColor:
                       Theme.of(context).brightness == Brightness.dark
                       ? Colors.white10
                       : const Color(0xFFE2E8F0),
                 ),
+                const SizedBox(width: 48),
                 _ProfileBubble(
                   icon: Icons.watch_outlined,
                   label: device.connectionMode,
@@ -111,11 +115,13 @@ class _ProfileBubble extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.backgroundColor,
+    this.imagePath,
   });
 
   final IconData icon;
   final String label;
   final Color backgroundColor;
+  final String? imagePath;
 
   @override
   Widget build(BuildContext context) {
@@ -124,7 +130,10 @@ class _ProfileBubble extends StatelessWidget {
         CircleAvatar(
           radius: 48,
           backgroundColor: backgroundColor,
-          child: Icon(icon, size: 42, color: AppColors.primaryText(context)),
+          backgroundImage: imagePath != null ? FileImage(File(imagePath!)) : null,
+          child: imagePath == null
+              ? Icon(icon, size: 42, color: AppColors.primaryText(context))
+              : null,
         ),
         const SizedBox(height: 10),
         Text(

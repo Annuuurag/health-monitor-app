@@ -6,6 +6,7 @@ class UserProfile {
     required this.heightCm,
     required this.weightKg,
     required this.emergencyContact,
+    this.profileImagePath,
   });
 
   final String name;
@@ -14,6 +15,7 @@ class UserProfile {
   final int heightCm;
   final int weightKg;
   final String emergencyContact;
+  final String? profileImagePath;
 
   factory UserProfile.defaults() {
     return const UserProfile(
@@ -33,6 +35,7 @@ class UserProfile {
     int? heightCm,
     int? weightKg,
     String? emergencyContact,
+    String? profileImagePath,
   }) {
     return UserProfile(
       name: name ?? this.name,
@@ -41,6 +44,7 @@ class UserProfile {
       heightCm: heightCm ?? this.heightCm,
       weightKg: weightKg ?? this.weightKg,
       emergencyContact: emergencyContact ?? this.emergencyContact,
+      profileImagePath: profileImagePath ?? this.profileImagePath,
     );
   }
 
@@ -52,6 +56,7 @@ class UserProfile {
       'heightCm': heightCm,
       'weightKg': weightKg,
       'emergencyContact': emergencyContact,
+      if (profileImagePath != null) 'profileImagePath': profileImagePath,
     };
   }
 
@@ -64,6 +69,7 @@ class UserProfile {
       weightKg: json['weightKg'] as int? ?? 69,
       emergencyContact:
           json['emergencyContact'] as String? ?? '+91 98765 43210',
+      profileImagePath: json['profileImagePath'] as String?,
     );
   }
 }

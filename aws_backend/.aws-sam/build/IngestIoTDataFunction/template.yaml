@@ -1,0 +1,202 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Health Monitor Backend
+  
+  SAM Template for deploying IoT Core integrations, Kinesis Firehose for raw ML data, 
+  DynamoDB for hot storage, and API Gateway for the Flutter App.
+
+Parameters:
+  DeployColdStorage:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: "Set to true to deploy Kinesis Firehose and S3 bucket for ML data (requires AWS service subscription)"
+
+Conditions:
+  ShouldDeployColdStorage: !Equals [!Ref DeployColdStorage, "true"]
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs20.x
+    MemorySize: 256
+
+Resources:
+  # ---------------------------------------------------------------------------
+  # 1. Hot Storage (For Flutter App)
+  # ---------------------------------------------------------------------------
+  HealthTelemetrySummaries:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: HealthTelemetrySummaries
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: deviceId
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: deviceId
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+
+  # ---------------------------------------------------------------------------
+  # 2. Cold Storage (For ML Training - Raw Data)
+  # ---------------------------------------------------------------------------
+  RawHealthDataBucket:
+    Type: AWS::S3::Bucket
+    Condition: ShouldDeployColdStorage
+    Properties:
+      BucketName: !Sub "health-raw-data-ml-${AWS::AccountId}-${AWS::Region}"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  FirehoseDeliveryRole:
+    Type: AWS::IAM::Role
+    Condition: ShouldDeployColdStorage
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: FirehoseS3Access
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:AbortMultipartUpload
+                  - s3:GetBucketLocation
+                  - s3:GetObject
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
+                  - s3:PutObject
+                Resource:
+                  - !GetAtt RawHealthDataBucket.Arn
+                  - !Sub "${RawHealthDataBucket.Arn}/*"
+
+  RawDataDeliveryStream:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Condition: ShouldDeployColdStorage
+    Properties:
+      DeliveryStreamName: HealthRawDataDeliveryStream
+      ExtendedS3DestinationConfiguration:
+        BucketARN: !GetAtt RawHealthDataBucket.Arn
+        BufferingHints:
+          IntervalInSeconds: 60
+          SizeInMBs: 5
+        CompressionFormat: GZIP
+        RoleARN: !GetAtt FirehoseDeliveryRole.Arn
+
+  # ---------------------------------------------------------------------------
+  # 3. AWS Lambda Functions
+  # ---------------------------------------------------------------------------
+  FetchAppTelemetryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: FetchAppTelemetry.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref HealthTelemetrySummaries
+      Events:
+        GetTelemetry:
+          Type: Api
+          Properties:
+            Path: /telemetry
+            Method: get
+
+  IngestIoTDataFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: IngestIoTData.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref HealthTelemetrySummaries
+
+  # ---------------------------------------------------------------------------
+  # 4. AWS IoT Core Rules
+  # ---------------------------------------------------------------------------
+  IoTRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: iot.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: IoTLambdaAccess
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt IngestIoTDataFunction.Arn
+        - !If
+          - ShouldDeployColdStorage
+          - PolicyName: IoTFirehoseAccess
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - firehose:PutRecord
+                    - firehose:PutRecordBatch
+                  Resource: !GetAtt RawDataDeliveryStream.Arn
+          - !Ref "AWS::NoValue"
+
+  # Rule to send raw data directly to S3 via Firehose
+  IoTRuleForRawData:
+    Type: AWS::IoT::TopicRule
+    Condition: ShouldDeployColdStorage
+    Properties:
+      RuleName: RouteRawDataToFirehose
+      TopicRulePayload:
+        RuleDisabled: false
+        Sql: "SELECT * FROM 'health/+/raw'"
+        Actions:
+          - Firehose:
+              DeliveryStreamName: !Ref RawDataDeliveryStream
+              RoleArn: !GetAtt IoTRole.Arn
+              Separator: "\n"
+
+  # Rule to send data to Lambda for Aggregation
+  IoTRuleForAggregation:
+    Type: AWS::IoT::TopicRule
+    Properties:
+      RuleName: RouteDataToLambda
+      TopicRulePayload:
+        RuleDisabled: false
+        Sql: "SELECT * as data, topic(2) as deviceId FROM 'health/+/raw'"
+        Actions:
+          - Lambda:
+              FunctionArn: !GetAtt IngestIoTDataFunction.Arn
+
+  PermissionForIoTToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref IngestIoTDataFunction
+      Action: lambda:InvokeFunction
+      Principal: iot.amazonaws.com
+      SourceArn: !GetAtt IoTRuleForAggregation.Arn
+
+Outputs:
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL for Flutter App"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/telemetry"
+  RawS3BucketName:
+    Description: "S3 Bucket containing raw ML data"
+    Value: !If [ShouldDeployColdStorage, !Ref RawHealthDataBucket, "Disabled"]

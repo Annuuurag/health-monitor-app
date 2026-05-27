@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../app/state/app_controller.dart';
 import '../../core/app_colors.dart';
@@ -21,6 +24,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   late final TextEditingController _heightController;
   late final TextEditingController _weightController;
   late final TextEditingController _contactController;
+  String? _profileImagePath;
   bool _isEditing = false;
 
   @override
@@ -37,6 +41,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       text: profile.weightKg.toString(),
     );
     _contactController = TextEditingController(text: profile.emergencyContact);
+    _profileImagePath = profile.profileImagePath;
   }
 
   @override
@@ -65,25 +70,34 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 backgroundColor: Theme.of(context).brightness == Brightness.dark
                     ? Colors.white10
                     : const Color(0xFFE2E8F0),
-                child: Icon(
-                  Icons.person_outline,
-                  size: 90,
-                  color: AppColors.primaryText(context),
-                ),
+                backgroundImage: _profileImagePath != null
+                    ? FileImage(File(_profileImagePath!))
+                    : null,
+                child: _profileImagePath == null
+                    ? Icon(
+                        Icons.person_outline,
+                        size: 90,
+                        color: AppColors.primaryText(context),
+                      )
+                    : null,
               ),
-              Positioned(
-                right: 6,
-                bottom: 6,
-                child: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: const BoxDecoration(
-                    color: AppColors.teal,
-                    shape: BoxShape.circle,
+              if (_isEditing)
+                Positioned(
+                  right: 6,
+                  bottom: 6,
+                  child: GestureDetector(
+                    onTap: _pickImage,
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: const BoxDecoration(
+                        color: AppColors.teal,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.edit, color: Colors.white, size: 18),
+                    ),
                   ),
-                  child: const Icon(Icons.edit, color: Colors.white, size: 18),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: 18),
@@ -128,6 +142,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             _heightController.text = profile.heightCm.toString();
                             _weightController.text = profile.weightKg.toString();
                             _contactController.text = profile.emergencyContact;
+                            _profileImagePath = profile.profileImagePath;
                           }
                           _isEditing = !_isEditing;
                         });
@@ -227,6 +242,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _profileImagePath = pickedFile.path;
+      });
+    }
+  }
+
   Future<void> _save() async {
     final profile = UserProfile(
       name: _nameController.text.trim(),
@@ -241,6 +266,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           int.tryParse(_weightController.text) ??
           widget.controller.userProfile.weightKg,
       emergencyContact: _contactController.text.trim(),
+      profileImagePath: _profileImagePath,
     );
 
     await widget.controller.updateUserProfile(profile);
