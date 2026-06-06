@@ -1,5 +1,8 @@
-const AWS = require('aws-sdk');
-const dynamo = new AWS.DynamoDB.DocumentClient();
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, PutCommand } = require('@aws-sdk/lib-dynamodb');
+
+const client = new DynamoDBClient({});
+const dynamo = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = process.env.TABLE_NAME || 'HealthTelemetrySummaries';
 
@@ -60,7 +63,7 @@ exports.handler = async (event) => {
             Item: item
         };
 
-        await dynamo.put(params).promise();
+        await dynamo.send(new PutCommand(params));
         console.log("Successfully saved summary to DynamoDB", item);
 
         return { statusCode: 200, body: 'Data processed and saved' };

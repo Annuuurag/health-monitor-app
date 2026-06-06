@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:http/http.dart' as http;
 
 import '../../domain/models/health_snapshot.dart';
@@ -7,8 +8,7 @@ import '../../domain/repositories/telemetry_repository.dart';
 import '../mock/mock_seed_data.dart';
 
 class ApiTelemetryRepository implements TelemetryRepository {
-  // TODO: Replace this with your actual AWS API Gateway URL
-  final String apiUrl = ''; 
+  final String apiUrl = 'https://vfeh40pll0.execute-api.ap-south-1.amazonaws.com/Prod/telemetry'; 
 
   @override
   Future<HealthSnapshot> getLatestSnapshot() async {
@@ -38,7 +38,7 @@ class ApiTelemetryRepository implements TelemetryRepository {
         }
       }
     } catch (e) {
-      print('Error fetching latest snapshot from API: $e');
+      developer.log('Error fetching latest snapshot from API: $e');
     }
     
     // Fallback to mock data on error
@@ -72,7 +72,7 @@ class ApiTelemetryRepository implements TelemetryRepository {
         }
       }
     } catch (e) {
-      print('Error fetching recent samples from API: $e');
+      developer.log('Error fetching recent samples from API: $e');
     }
     
     // Fallback to mock data on error

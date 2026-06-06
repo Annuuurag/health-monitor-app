@@ -4,10 +4,10 @@ version = 0.1
 stack_name = "health-monitor-backend"
 resolve_s3 = true
 s3_prefix = "health-monitor-backend"
-region = "ap-south-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 image_repositories = []
+parameter_overrides = "DeployColdStorage=\"false\""
 
 [default.global.parameters]
 region = "ap-south-1"

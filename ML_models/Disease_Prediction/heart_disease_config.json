@@ -1,0 +1,17 @@
+{
+    "model_type": "SoftVotingEnsemble",
+    "training_date": "2026-06-06 23:21:31",
+    "dataset": "Cleveland Heart Disease",
+    "accuracy": {
+        "train": 0.8842975206611571,
+        "test": 0.8852459016393442
+    },
+    "auc_roc": 0.948051948051948,
+    "sensitivity": 0.8928571428571429,
+    "specificity": 0.8787878787878788,
+    "components": [
+        "rf",
+        "svm",
+        "xgb"
+    ]
+}

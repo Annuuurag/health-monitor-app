@@ -1,5 +1,8 @@
-const AWS = require('aws-sdk');
-const dynamo = new AWS.DynamoDB.DocumentClient();
+const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
+const { DynamoDBDocumentClient, QueryCommand } = require('@aws-sdk/lib-dynamodb');
+
+const client = new DynamoDBClient({});
+const dynamo = DynamoDBDocumentClient.from(client);
 
 const TABLE_NAME = process.env.TABLE_NAME || 'HealthTelemetrySummaries';
 
@@ -18,7 +21,7 @@ exports.handler = async (event) => {
             Limit: 20
         };
 
-        const result = await dynamo.query(params).promise();
+        const result = await dynamo.send(new QueryCommand(params));
         const items = result.Items || [];
 
         // Format for the Flutter App

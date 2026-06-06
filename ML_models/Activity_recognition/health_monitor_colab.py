@@ -1,0 +1,332 @@
+"""
+Activity Recognition using LSTM - WISDM Dataset
+Simple, clean code for model training
+"""
+
+# ============================================================================
+# IMPORTS
+# ============================================================================
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
+import warnings
+warnings.filterwarnings('ignore')
+
+print("Libraries imported successfully!")
+print(f"TensorFlow version: {tf.__version__}")
+print(f"GPU available: {len(tf.config.list_physical_devices('GPU')) > 0}")
+
+# ============================================================================
+# LOAD DATASET
+# ============================================================================
+
+print("\n" + "="*70)
+print("STEP 1: LOAD WISDM DATASET")
+print("="*70)
+
+# Upload file
+from google.colab import files
+uploaded = files.upload()
+
+# Load data
+def load_wisdm_data(filename='WISDM_ar_v1.1_raw.txt'):
+    """Load WISDM data with error handling for malformed rows"""
+    
+    print("Loading dataset with error handling...")
+    
+    # Read file line by line to handle errors
+    data_list = []
+    skipped_rows = 0
+    
+    with open(filename, 'r') as f:
+        for line_num, line in enumerate(f, 1):
+            try:
+                # Remove whitespace
+                line = line.strip()
+                
+                # Skip empty lines
+                if not line:
+                    continue
+                
+                # Remove semicolon
+                line = line.replace(';', '')
+                
+                # Split by comma
+                parts = line.split(',')
+                
+                # Should have exactly 6 parts: user, activity, timestamp, x, y, z
+                if len(parts) == 6:
+                    user = int(parts[0])
+                    activity = parts[1].strip()
+                    timestamp = int(parts[2])
+                    x = float(parts[3])
+                    y = float(parts[4])
+                    z = float(parts[5])
+                    
+                    data_list.append([user, activity, timestamp, x, y, z])
+                    
+                elif len(parts) == 7:
+                    # Handle extra comma case: user, activity, timestamp, x, y, z, empty
+                    user = int(parts[0])
+                    activity = parts[1].strip()
+                    timestamp = int(parts[2])
+                    x = float(parts[3])
+                    y = float(parts[4])
+                    z = float(parts[5])
+                    # Ignore parts[6] (empty string)
+                    
+                    data_list.append([user, activity, timestamp, x, y, z])
+                    
+                else:
+                    # Skip malformed rows
+                    skipped_rows += 1
+                    
+            except (ValueError, IndexError) as e:
+                skipped_rows += 1
+                continue
+    
+    # Create DataFrame
+    column_names = ['user', 'activity', 'timestamp', 'x', 'y', 'z']
+    data = pd.DataFrame(data_list, columns=column_names)
+    
+    print(f"✓ Dataset loaded successfully!")
+    print(f"  Total samples: {len(data):,}")
+    print(f"  Skipped rows: {skipped_rows:,}")
+    print(f"  Number of users: {data['user'].nunique()}")
+    print(f"\nActivity distribution:")
+    print(data['activity'].value_counts())
+    
+    return data
+
+wisdm_data = load_wisdm_data()
+
+# ============================================================================
+# VISUALIZE DATA
+# ============================================================================
+
+print("\n" + "="*70)
+print("STEP 2: DATA VISUALIZATION")
+print("="*70)
+
+# Plot activity distribution
+plt.figure(figsize=(10, 5))
+wisdm_data['activity'].value_counts().plot(kind='bar', color='skyblue', edgecolor='black')
+plt.title('Activity Distribution', fontsize=14, fontweight='bold')
+plt.xlabel('Activity')
+plt.ylabel('Count')
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+
+# ============================================================================
+# CREATE WINDOWS FOR LSTM
+# ============================================================================
+
+print("\n" + "="*70)
+print("STEP 3: CREATE SLIDING WINDOWS")
+print("="*70)
+
+def create_segments(data, window_size=80, step=40):
+    segments = []
+    labels = []
+    
+    for user in data['user'].unique():
+        user_data = data[data['user'] == user]
+        
+        for activity in user_data['activity'].unique():
+            activity_data = user_data[user_data['activity'] == activity]
+            values = activity_data[['x', 'y', 'z']].values
+            
+            for i in range(0, len(values) - window_size, step):
+                segment = values[i:i + window_size]
+                segments.append(segment)
+                labels.append(activity)
+    
+    return np.array(segments), np.array(labels)
+
+# Create segments
+X, y = create_segments(wisdm_data)
+print(f"Created {len(X):,} segments")
+print(f"Shape: {X.shape}")
+
+# Encode labels
+label_encoder = LabelEncoder()
+y_encoded = label_encoder.fit_transform(y)
+
+print(f"\nLabel encoding:")
+for i, activity in enumerate(label_encoder.classes_):
+    print(f"  {i}: {activity}")
+
+# Split data
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y_encoded, test_size=0.2, random_state=42, stratify=y_encoded
+)
+
+print(f"\nTraining samples: {len(X_train):,}")
+print(f"Testing samples: {len(X_test):,}")
+
+# ============================================================================
+# BUILD LSTM MODEL
+# ============================================================================
+
+print("\n" + "="*70)
+print("STEP 4: BUILD LSTM MODEL")
+print("="*70)
+
+num_classes = len(label_encoder.classes_)
+input_shape = (X_train.shape[1], X_train.shape[2])
+
+model = keras.Sequential([
+    layers.LSTM(128, return_sequences=True, input_shape=input_shape),
+    layers.Dropout(0.3),
+    layers.LSTM(64),
+    layers.Dropout(0.3),
+    layers.Dense(32, activation='relu'),
+    layers.Dropout(0.2),
+    layers.Dense(num_classes, activation='softmax')
+])
+
+model.compile(
+    optimizer='adam',
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+print("Model built successfully!")
+model.summary()
+
+# ============================================================================
+# TRAIN MODEL
+# ============================================================================
+
+print("\n" + "="*70)
+print("STEP 5: TRAIN MODEL")
+print("="*70)
+
+EPOCHS = 20
+BATCH_SIZE = 64
+
+history = model.fit(
+    X_train, y_train,
+    epochs=EPOCHS,
+    batch_size=BATCH_SIZE,
+    validation_split=0.2,
+    verbose=1
+)
+
+# ============================================================================
+# EVALUATE MODEL
+# ============================================================================
+
+print("\n" + "="*70)
+print("STEP 6: EVALUATE MODEL")
+print("="*70)
+
+# Test set evaluation
+test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose=0)
+print(f"\nTest Accuracy: {test_accuracy*100:.2f}%")
+print(f"Test Loss: {test_loss:.4f}")
+
+# Predictions
+y_pred = model.predict(X_test, verbose=0)
+y_pred_classes = np.argmax(y_pred, axis=1)
+
+# Classification report
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred_classes, 
+                          target_names=label_encoder.classes_))
+
+# ============================================================================
+# VISUALIZATIONS
+# ============================================================================
+
+print("\n" + "="*70)
+print("STEP 7: VISUALIZATIONS")
+print("="*70)
+
+fig, axes = plt.subplots(2, 2, figsize=(15, 12))
+
+# Accuracy plot
+axes[0, 0].plot(history.history['accuracy'], label='Train', linewidth=2)
+axes[0, 0].plot(history.history['val_accuracy'], label='Validation', linewidth=2)
+axes[0, 0].set_title('Model Accuracy', fontsize=12, fontweight='bold')
+axes[0, 0].set_xlabel('Epoch')
+axes[0, 0].set_ylabel('Accuracy')
+axes[0, 0].legend()
+axes[0, 0].grid(alpha=0.3)
+
+# Loss plot
+axes[0, 1].plot(history.history['loss'], label='Train', linewidth=2)
+axes[0, 1].plot(history.history['val_loss'], label='Validation', linewidth=2)
+axes[0, 1].set_title('Model Loss', fontsize=12, fontweight='bold')
+axes[0, 1].set_xlabel('Epoch')
+axes[0, 1].set_ylabel('Loss')
+axes[0, 1].legend()
+axes[0, 1].grid(alpha=0.3)
+
+# Confusion matrix
+cm = confusion_matrix(y_test, y_pred_classes)
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+            xticklabels=label_encoder.classes_,
+            yticklabels=label_encoder.classes_,
+            ax=axes[1, 0])
+axes[1, 0].set_title('Confusion Matrix', fontsize=12, fontweight='bold')
+axes[1, 0].set_ylabel('True Label')
+axes[1, 0].set_xlabel('Predicted Label')
+
+# Normalized confusion matrix
+cm_norm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis] * 100
+sns.heatmap(cm_norm, annot=True, fmt='.1f', cmap='Greens',
+            xticklabels=label_encoder.classes_,
+            yticklabels=label_encoder.classes_,
+            ax=axes[1, 1])
+axes[1, 1].set_title('Normalized Confusion Matrix (%)', fontsize=12, fontweight='bold')
+axes[1, 1].set_ylabel('True Label')
+axes[1, 1].set_xlabel('Predicted Label')
+
+plt.tight_layout()
+plt.show()
+
+# ============================================================================
+# DEMO PREDICTIONS
+# ============================================================================
+
+print("\n" + "="*70)
+print("STEP 8: DEMO PREDICTIONS")
+print("="*70)
+
+# Test with random samples
+for i in range(3):
+    idx = np.random.randint(0, len(X_test))
+    sample = X_test[idx].reshape(1, 80, 3)
+    
+    prediction = model.predict(sample, verbose=0)[0]
+    predicted_class = np.argmax(prediction)
+    
+    print(f"\nSample {i+1}:")
+    print(f"  True: {label_encoder.classes_[y_test[idx]]}")
+    print(f"  Predicted: {label_encoder.classes_[predicted_class]}")
+    print(f"  Confidence: {prediction[predicted_class]*100:.1f}%")
+
+# ============================================================================
+# SUMMARY
+# ============================================================================
+
+print("\n" + "="*70)
+print("TRAINING COMPLETE!")
+print("="*70)
+print(f"\nFinal Test Accuracy: {test_accuracy*100:.2f}%")
+print(f"Model ready for deployment!")
+print("\nNext steps:")
+print("  1. Save model: model.save('activity_model.h5')")
+print("  2. Deploy to cloud (Firebase/AWS)")
+print("  3. Integrate with ESP32")
+print("="*70)

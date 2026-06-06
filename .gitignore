@@ -4,6 +4,7 @@
 *.pyc
 *.swp
 .DS_Store
+._*
 .atom/
 .build/
 .buildlog/
@@ -52,3 +53,25 @@ app.*.map.json
 android/key.properties
 *.jks
 *.keystore
+
+# Python Virtual Environment
+.venv/
+venv/
+ENV/
+__pycache__/
+*.pyc
+
+# ML Models and Scalers (saved as binaries)
+*.keras
+*.pkl
+*.npy
+
+# Datasets and Data Files
+*.csv
+*.data
+ML_models/**/WISDM_ar_v1.1_raw.txt
+
+# Generated Plots and Figures
+*.png
+*.jpg
+*.jpeg
