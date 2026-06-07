@@ -34,7 +34,10 @@ exports.handler = async (event) => {
             readingsCount: item.readingsCount || 1,
             signalQuality: item.signalQuality || 0.95,
             activityLabel: item.activityLabel || 'Resting',
-            source: 'AWS Backend'
+            source: 'AWS Backend',
+            isAnomaly: item.isAnomaly !== undefined ? item.isAnomaly : false,
+            overallStatus: item.overallStatus || 'Normal',
+            summary: item.summary || 'Your vitals are looking good.'
         }));
 
         const latest = responseData.length > 0 ? responseData[0] : null;
@@ -49,9 +52,9 @@ exports.handler = async (event) => {
                 bodyTempC: latest.bodyTempC,
                 activityLabel: latest.activityLabel,
                 signalQuality: latest.signalQuality,
-                overallStatus: 'Normal',
-                isAnomaly: false,
-                summary: 'Your vitals are looking good.'
+                overallStatus: latest.overallStatus,
+                isAnomaly: latest.isAnomaly,
+                summary: latest.summary
             };
         }
 
