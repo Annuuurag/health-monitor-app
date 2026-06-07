@@ -32,14 +32,7 @@ import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')
 
-# Check for xgboost installation, handle fallback gracefully
-try:
-    from xgboost import XGBClassifier
-    xgb_available = True
-except ImportError:
-    xgb_available = False
-    print("XGBoost library not found. Falling back to Logistic Regression in the voting ensemble.")
-    print("[INFO] Colab has xgboost pre-installed. Run 'pip install xgboost' if executing locally.")
+from sklearn.ensemble import HistGradientBoostingClassifier
 
 print("="*75)
 print("OPTIMIZED HEART DISEASE PREDICTION")
@@ -118,28 +111,24 @@ best_rf = rf_grid.best_estimator_
 print(f"  Best RF Params: {rf_grid.best_params_}")
 print(f"  Best RF Train CV Accuracy: {rf_grid.best_score_*100:.2f}%")
 
-if xgb_available:
-    print("\nGridSearchCV Tuning for XGBoost Classifier...")
-    xgb_param_grid = {
-        'n_estimators': [50, 100, 150],
-        'max_depth': [3, 5, 7],
-        'learning_rate': [0.01, 0.05, 0.1, 0.2],
-        'subsample': [0.8, 1.0]
-    }
-    xgb_grid = GridSearchCV(
-        estimator=XGBClassifier(random_state=42, eval_metric='logloss'),
-        param_grid=xgb_param_grid,
-        cv=5,
-        scoring='accuracy',
-        n_jobs=-1
-    )
-    xgb_grid.fit(X_train_scaled, y_train)
-    best_xgb = xgb_grid.best_estimator_
-    print(f"  Best XGB Params: {xgb_grid.best_params_}")
-    print(f"  Best XGB Train CV Accuracy: {xgb_grid.best_score_*100:.2f}%")
-else:
-    best_xgb = LogisticRegression(max_iter=1000, random_state=42)
-    best_xgb.fit(X_train_scaled, y_train)
+print("\nGridSearchCV Tuning for HistGradientBoosting Classifier...")
+hgb_param_grid = {
+    'max_iter': [50, 100, 150],
+    'max_depth': [3, 5, 7, None],
+    'learning_rate': [0.01, 0.05, 0.1, 0.2],
+    'l2_regularization': [0.0, 0.1, 1.0]
+}
+hgb_grid = GridSearchCV(
+    estimator=HistGradientBoostingClassifier(random_state=42),
+    param_grid=hgb_param_grid,
+    cv=5,
+    scoring='accuracy',
+    n_jobs=-1
+)
+hgb_grid.fit(X_train_scaled, y_train)
+best_hgb = hgb_grid.best_estimator_
+print(f"  Best HGB Params: {hgb_grid.best_params_}")
+print(f"  Best HGB Train CV Accuracy: {hgb_grid.best_score_*100:.2f}%")
 
 # Support Vector Machine (SVM) Classifier
 print("\nGridSearchCV Tuning for Support Vector Machine (SVC)...")
@@ -167,19 +156,16 @@ print("\nBuilding Soft-Voting Ensemble Classifier...")
 
 estimators = [
     ('rf', best_rf),
-    ('svm', best_svm)
+    ('svm', best_svm),
+    ('hgb', best_hgb)
 ]
-if xgb_available:
-    estimators.append(('xgb', best_xgb))
-else:
-    estimators.append(('lr', best_xgb)) # fallback to logistic regression
 
 voting_ensemble = VotingClassifier(
     estimators=estimators,
     voting='soft'
 )
 voting_ensemble.fit(X_train_scaled, y_train)
-print("[OK] Stacking Ensemble trained successfully!")
+print("[OK] Soft-Voting Ensemble trained successfully!")
 
 # Save the ensemble model
 with open("prediction_model.pkl", "wb") as f:

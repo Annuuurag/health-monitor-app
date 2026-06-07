@@ -6,24 +6,326 @@ import '../../core/app_colors.dart';
 import '../../core/widgets/screen_scaffold.dart';
 import '../../domain/models/insight_result.dart';
 
-class InsightsScreen extends StatelessWidget {
+class InsightsScreen extends StatefulWidget {
   const InsightsScreen({super.key, required this.controller});
 
   final AppController controller;
 
   @override
+  State<InsightsScreen> createState() => _InsightsScreenState();
+}
+
+class _InsightsScreenState extends State<InsightsScreen> {
+  InsightResult? _assessmentResult;
+  bool _isLoadingAssessment = false;
+  String? _assessmentError;
+
+  Future<void> _startAssessment() async {
+    final Map<String, dynamic>? clinicalData = await showModalBottomSheet<Map<String, dynamic>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _AssessmentFormBottomSheet(),
+    );
+
+    if (clinicalData == null) return;
+
+    setState(() {
+      _isLoadingAssessment = true;
+      _assessmentError = null;
+      _assessmentResult = null;
+    });
+
+    try {
+      final result = await widget.controller.insightsRepository.predictHeartDisease(clinicalData);
+      setState(() {
+        _assessmentResult = result;
+      });
+    } catch (e) {
+      setState(() {
+        _assessmentError = 'Assessment failed. Please check your internet connection.';
+      });
+    } finally {
+      setState(() {
+        _isLoadingAssessment = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ScreenScaffold(
       title: 'Insights',
-      body: Column(
-        children: controller.insights
-            .map(
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildAssessmentSection(),
+            const SizedBox(height: 24),
+            Text(
+              'General Health Insights',
+              style: TextStyle(
+                color: AppColors.primaryText(context),
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...widget.controller.insights.map(
               (insight) => Padding(
                 padding: const EdgeInsets.only(bottom: 16),
                 child: _InsightCard(insight: insight),
               ),
-            )
-            .toList(growable: false),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssessmentSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (_isLoadingAssessment) {
+      return Container(
+        width: double.infinity,
+        decoration: AppTheme.cardDecoration(context),
+        padding: const EdgeInsets.all(24),
+        child: const Column(
+          children: [
+            CircularProgressIndicator(color: AppColors.teal),
+            SizedBox(height: 16),
+            Text(
+              'Analyzing Heart Disease Risk...',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Consulting Soft-Voting Ensemble on AWS Lambda...',
+              style: TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_assessmentError != null) {
+      return Container(
+        width: double.infinity,
+        decoration: AppTheme.cardDecoration(context),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            const Icon(Icons.error_outline, color: AppColors.danger, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              _assessmentError!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.primaryText(context), fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _startAssessment,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.teal,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Try Again'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_assessmentResult != null) {
+      final result = _assessmentResult!;
+      final severityColor = switch (result.severity) {
+        InsightSeverity.high => AppColors.danger,
+        InsightSeverity.moderate => AppColors.amber,
+        InsightSeverity.low => AppColors.success,
+      };
+
+      return Container(
+        width: double.infinity,
+        decoration: AppTheme.cardDecoration(context),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Assessment Result',
+                  style: TextStyle(
+                    color: AppColors.primaryText(context),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _startAssessment,
+                  tooltip: 'Retake Assessment',
+                ),
+              ],
+            ),
+            const Divider(),
+            const SizedBox(height: 16),
+            // Custom Visual Gauge Indicator
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 130,
+                  height: 130,
+                  child: CircularProgressIndicator(
+                    value: result.confidence,
+                    strokeWidth: 10,
+                    backgroundColor: isDark ? Colors.black26 : Colors.grey.shade200,
+                    color: severityColor,
+                  ),
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${(result.confidence * 100).toStringAsFixed(1)}%',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryText(context),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Probability',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.secondaryText(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Container(
+              decoration: BoxDecoration(
+                color: severityColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: severityColor.withValues(alpha: 0.3)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Text(
+                switch (result.severity) {
+                  InsightSeverity.high => 'HIGH RISK INDICATORS',
+                  InsightSeverity.moderate => 'MODERATE RISK INDICATORS',
+                  InsightSeverity.low => 'LOW RISK INDICATORS',
+                },
+                style: TextStyle(
+                  color: severityColor,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.1,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              result.summary,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.primaryText(context),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: isDark ? Colors.black12 : Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                result.suggestion,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.secondaryText(context),
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Default Call-to-Action card
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.teal, Color(0xFF008B90)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.teal.withValues(alpha: 0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.health_and_safety, color: Colors.white, size: 28),
+              SizedBox(width: 8),
+              Text(
+                'AI Heart Disease Risk',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Complete a clinical vitals survey to run a heart disease risk evaluation using our Soft-Voting Stacking Ensemble model.',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xEAEAEAEA),
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: _startAssessment,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.teal,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              elevation: 0,
+            ),
+            icon: const Icon(Icons.arrow_forward),
+            label: const Text(
+              'Start Risk Assessment',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -91,6 +393,389 @@ class _InsightCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AssessmentFormBottomSheet extends StatefulWidget {
+  const _AssessmentFormBottomSheet();
+
+  @override
+  State<_AssessmentFormBottomSheet> createState() => _AssessmentFormBottomSheetState();
+}
+
+class _AssessmentFormBottomSheetState extends State<_AssessmentFormBottomSheet> {
+  final _formKey = GlobalKey<FormState>();
+
+  // Form Field values with default clinical averages
+  double _age = 50;
+  double _sex = 1.0; // Male
+  double _cp = 3.0; // Non-anginal
+  final _bpController = TextEditingController(text: '125');
+  final _cholController = TextEditingController(text: '220');
+  double _fbs = 0.0; // <= 120
+  double _restecg = 0.0; // Normal
+  final _hrController = TextEditingController(text: '145');
+  double _exang = 0.0; // No
+  final _oldpeakController = TextEditingController(text: '0.8');
+  double _slope = 1.0; // Upsloping
+  double _ca = 0.0; // 0 vessels
+  double _thal = 3.0; // Normal
+
+  @override
+  void dispose() {
+    _bpController.dispose();
+    _cholController.dispose();
+    _hrController.dispose();
+    _oldpeakController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
+
+    final clinicalData = {
+      'age': _age,
+      'sex': _sex,
+      'cp': _cp,
+      'trestbps': double.parse(_bpController.text),
+      'chol': double.parse(_cholController.text),
+      'fbs': _fbs,
+      'restecg': _restecg,
+      'thalach': double.parse(_hrController.text),
+      'exang': _exang,
+      'oldpeak': double.parse(_oldpeakController.text),
+      'slope': _slope,
+      'ca': _ca,
+      'thal': _thal,
+    };
+
+    Navigator.of(context).pop(clinicalData);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? AppColors.darkCard : Colors.white;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        children: [
+          // Drag handle
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade400,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Clinical Vitals Survey',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppColors.primaryText(context),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'All features match Cleveland clinical indicators',
+            style: TextStyle(fontSize: 12, color: AppColors.secondaryText(context)),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    // Age slider
+                    _buildSliderRow(
+                      label: 'Age',
+                      value: _age,
+                      min: 10,
+                      max: 100,
+                      divisions: 90,
+                      suffix: 'yrs',
+                      onChanged: (val) => setState(() => _age = val),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Sex dropdown
+                    _buildDropdownRow<double>(
+                      label: 'Sex',
+                      value: _sex,
+                      items: const [
+                        DropdownMenuItem(value: 1.0, child: Text('Male')),
+                        DropdownMenuItem(value: 0.0, child: Text('Female')),
+                      ],
+                      onChanged: (val) => setState(() => _sex = val!),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Chest Pain Type dropdown
+                    _buildDropdownRow<double>(
+                      label: 'Chest Pain Type',
+                      value: _cp,
+                      items: const [
+                        DropdownMenuItem(value: 1.0, child: Text('Typical Angina')),
+                        DropdownMenuItem(value: 2.0, child: Text('Atypical Angina')),
+                        DropdownMenuItem(value: 3.0, child: Text('Non-Anginal Pain')),
+                        DropdownMenuItem(value: 4.0, child: Text('Asymptomatic')),
+                      ],
+                      onChanged: (val) => setState(() => _cp = val!),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Resting Blood Pressure
+                    _buildTextFieldRow(
+                      label: 'Resting BP',
+                      controller: _bpController,
+                      suffix: 'mm Hg',
+                      validator: (val) {
+                        if (val == null || val.isEmpty) return 'Required';
+                        final num = int.tryParse(val);
+                        if (num == null || num < 60 || num > 250) return 'Enter 60-250';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Serum Cholesterol
+                    _buildTextFieldRow(
+                      label: 'Cholesterol',
+                      controller: _cholController,
+                      suffix: 'mg/dl',
+                      validator: (val) {
+                        if (val == null || val.isEmpty) return 'Required';
+                        final num = int.tryParse(val);
+                        if (num == null || num < 100 || num > 600) return 'Enter 100-600';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Fasting Blood Sugar
+                    _buildDropdownRow<double>(
+                      label: 'Fasting Blood Sugar',
+                      value: _fbs,
+                      items: const [
+                        DropdownMenuItem(value: 0.0, child: Text('<= 120 mg/dl')),
+                        DropdownMenuItem(value: 1.0, child: Text('> 120 mg/dl')),
+                      ],
+                      onChanged: (val) => setState(() => _fbs = val!),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Resting ECG
+                    _buildDropdownRow<double>(
+                      label: 'Resting ECG',
+                      value: _restecg,
+                      items: const [
+                        DropdownMenuItem(value: 0.0, child: Text('Normal')),
+                        DropdownMenuItem(value: 1.0, child: Text('ST-T Wave Abnormality')),
+                        DropdownMenuItem(value: 2.0, child: Text('LV Hypertrophy')),
+                      ],
+                      onChanged: (val) => setState(() => _restecg = val!),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Max Heart Rate
+                    _buildTextFieldRow(
+                      label: 'Max Heart Rate',
+                      controller: _hrController,
+                      suffix: 'BPM',
+                      validator: (val) {
+                        if (val == null || val.isEmpty) return 'Required';
+                        final num = int.tryParse(val);
+                        if (num == null || num < 50 || num > 220) return 'Enter 50-220';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Exercise Induced Angina
+                    _buildDropdownRow<double>(
+                      label: 'Exercise Angina',
+                      value: _exang,
+                      items: const [
+                        DropdownMenuItem(value: 0.0, child: Text('No')),
+                        DropdownMenuItem(value: 1.0, child: Text('Yes')),
+                      ],
+                      onChanged: (val) => setState(() => _exang = val!),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ST Depression (oldpeak)
+                    _buildTextFieldRow(
+                      label: 'ST Depression',
+                      controller: _oldpeakController,
+                      suffix: 'mm',
+                      validator: (val) {
+                        if (val == null || val.isEmpty) return 'Required';
+                        final num = double.tryParse(val);
+                        if (num == null || num < 0.0 || num > 10.0) return 'Enter 0.0-10.0';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Slope of peak exercise ST segment
+                    _buildDropdownRow<double>(
+                      label: 'ST Peak Slope',
+                      value: _slope,
+                      items: const [
+                        DropdownMenuItem(value: 1.0, child: Text('Upsloping')),
+                        DropdownMenuItem(value: 2.0, child: Text('Flat')),
+                        DropdownMenuItem(value: 3.0, child: Text('Downsloping')),
+                      ],
+                      onChanged: (val) => setState(() => _slope = val!),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Number of major vessels colored by fluoroscopy
+                    _buildDropdownRow<double>(
+                      label: 'Major Vessels (ca)',
+                      value: _ca,
+                      items: const [
+                        DropdownMenuItem(value: 0.0, child: Text('0')),
+                        DropdownMenuItem(value: 1.0, child: Text('1')),
+                        DropdownMenuItem(value: 2.0, child: Text('2')),
+                        DropdownMenuItem(value: 3.0, child: Text('3')),
+                      ],
+                      onChanged: (val) => setState(() => _ca = val!),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Thalassemia
+                    _buildDropdownRow<double>(
+                      label: 'Thalassemia',
+                      value: _thal,
+                      items: const [
+                        DropdownMenuItem(value: 3.0, child: Text('Normal')),
+                        DropdownMenuItem(value: 6.0, child: Text('Fixed Defect')),
+                        DropdownMenuItem(value: 7.0, child: Text('Reversible Defect')),
+                      ],
+                      onChanged: (val) => setState(() => _thal = val!),
+                    ),
+                    const SizedBox(height: 32),
+
+                    // Submit button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: _submit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.teal,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Assess Cardiac Risk', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSliderRow({
+    required String label,
+    required double value,
+    required double min,
+    required double max,
+    required int divisions,
+    required String suffix,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text('${value.round()} $suffix', style: const TextStyle(color: AppColors.teal, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        Slider(
+          value: value,
+          min: min,
+          max: max,
+          divisions: divisions,
+          activeColor: AppColors.teal,
+          inactiveColor: Colors.grey.shade300,
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDropdownRow<T>({
+    required String label,
+    required T value,
+    required List<DropdownMenuItem<T>> items,
+    required ValueChanged<T?> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<T>(
+          initialValue: value,
+          items: items,
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: Colors.grey.withValues(alpha: 0.05),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextFieldRow({
+    required String label,
+    required TextEditingController controller,
+    required String suffix,
+    required String? Function(String?) validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          validator: validator,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            suffixText: suffix,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            filled: true,
+            fillColor: Colors.grey.withValues(alpha: 0.05),
+          ),
+        ),
+      ],
     );
   }
 }

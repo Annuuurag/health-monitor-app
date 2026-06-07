@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../data/local/local_storage.dart';
 import '../data/mock/mock_alerts_repository.dart';
 import '../data/mock/mock_device_repository.dart';
-import '../data/mock/mock_insights_repository.dart';
+import '../data/api/api_insights_repository.dart';
 import '../data/mock/mock_profile_repository.dart';
 import '../data/mock/mock_reminders_repository.dart';
 import '../data/mock/mock_reports_repository.dart';
@@ -19,7 +19,7 @@ AppController createAppController({NotificationService? notificationService}) {
   return AppController(
     telemetryRepository: ApiTelemetryRepository(),
     reportsRepository: MockReportsRepository(),
-    insightsRepository: MockInsightsRepository(),
+    insightsRepository: ApiInsightsRepository(),
     alertsRepository: MockAlertsRepository(),
     remindersRepository: MockRemindersRepository(localStorage),
     profileRepository: MockProfileRepository(localStorage),

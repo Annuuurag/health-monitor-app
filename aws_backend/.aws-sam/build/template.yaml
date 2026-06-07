@@ -120,12 +120,37 @@ Resources:
     Properties:
       CodeUri: IngestIoTDataFunction
       Handler: IngestIoTData.handler
+      Runtime: python3.12
+      MemorySize: 512
+      Layers:
+      - arn:aws:lambda:ap-south-1:336392948345:layer:AWSSDKPandas-Python312:12
       Policies:
       - DynamoDBCrudPolicy:
           TableName:
             Ref: HealthTelemetrySummaries
+      Environment:
+        Variables:
+          TABLE_NAME:
+            Ref: HealthTelemetrySummaries
     Metadata:
       SamResourceId: IngestIoTDataFunction
+  PredictDiseaseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: PredictDiseaseFunction
+      Handler: PredictDisease.handler
+      Runtime: python3.12
+      MemorySize: 512
+      Layers:
+      - arn:aws:lambda:ap-south-1:336392948345:layer:AWSSDKPandas-Python312:12
+      Events:
+        PostDiseasePrediction:
+          Type: Api
+          Properties:
+            Path: /disease-prediction
+            Method: post
+    Metadata:
+      SamResourceId: PredictDiseaseFunction
   IoTRole:
     Type: AWS::IAM::Role
     Properties:
