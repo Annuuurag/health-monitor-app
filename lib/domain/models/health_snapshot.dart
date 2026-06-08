@@ -6,6 +6,7 @@ class HealthSnapshot {
     required this.spo2Percent,
     required this.bodyTempC,
     required this.activityLabel,
+    required this.stepCount,
     required this.signalQuality,
     required this.overallStatus,
     required this.isAnomaly,
@@ -18,6 +19,7 @@ class HealthSnapshot {
   final double spo2Percent;
   final double bodyTempC;
   final String activityLabel;
+  final int stepCount;
   final double signalQuality;
   final String overallStatus;
   final bool isAnomaly;

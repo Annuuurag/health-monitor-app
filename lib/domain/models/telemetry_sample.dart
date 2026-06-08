@@ -6,6 +6,7 @@ class TelemetrySample {
     required this.spo2Percent,
     required this.bodyTempC,
     required this.activityLabel,
+    required this.stepCount,
     required this.signalQuality,
     required this.source,
   });
@@ -16,6 +17,7 @@ class TelemetrySample {
   final double spo2Percent;
   final double bodyTempC;
   final String activityLabel;
+  final int stepCount;
   final double signalQuality;
   final String source;
 
@@ -26,6 +28,7 @@ class TelemetrySample {
     double? spo2Percent,
     double? bodyTempC,
     String? activityLabel,
+    int? stepCount,
     double? signalQuality,
     String? source,
   }) {
@@ -36,6 +39,7 @@ class TelemetrySample {
       spo2Percent: spo2Percent ?? this.spo2Percent,
       bodyTempC: bodyTempC ?? this.bodyTempC,
       activityLabel: activityLabel ?? this.activityLabel,
+      stepCount: stepCount ?? this.stepCount,
       signalQuality: signalQuality ?? this.signalQuality,
       source: source ?? this.source,
     );

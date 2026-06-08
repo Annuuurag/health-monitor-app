@@ -30,6 +30,7 @@ class ApiTelemetryRepository implements TelemetryRepository {
             spo2Percent: (snapshotData['spo2Percent'] as num).toDouble(),
             bodyTempC: (snapshotData['bodyTempC'] as num).toDouble(),
             activityLabel: snapshotData['activityLabel'],
+            stepCount: (snapshotData['stepCount'] as num?)?.toInt() ?? 0,
             signalQuality: (snapshotData['signalQuality'] as num).toDouble(),
             overallStatus: snapshotData['overallStatus'],
             isAnomaly: snapshotData['isAnomaly'],
@@ -66,6 +67,7 @@ class ApiTelemetryRepository implements TelemetryRepository {
             spo2Percent: (s['spo2Percent'] as num).toDouble(),
             bodyTempC: (s['bodyTempC'] as num).toDouble(),
             activityLabel: s['activityLabel'],
+            stepCount: (s['stepCount'] as num?)?.toInt() ?? 0,
             signalQuality: (s['signalQuality'] as num).toDouble(),
             source: s['source'],
           )).toList();

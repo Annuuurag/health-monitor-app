@@ -125,25 +125,58 @@ def handler(event, context):
             spec_entropy
         ]])
         
-        # Load models and predict
-        load_models()
-        features_scaled = anomaly_scaler.transform(features_vector)
-        pred = anomaly_model.predict(features_scaled)
+        # Extract steps and finger detection status
+        steps = 0
+        finger_detected = True
         
-        # Predict values: -1 = Anomaly, 1 = Normal
-        is_anomaly = bool(pred[0] == -1)
-        
-        # Generate diagnostic text summary
-        overall_status = "Warning" if is_anomaly else "Normal"
-        if is_anomaly:
-            if avg_hr > 100 or avg_hr < 55:
-                summary_text = f"Abnormal heart rate detected: {avg_hr:.0f} BPM. Rest recommended."
-            elif avg_spo2 < 95:
-                summary_text = f"Low blood oxygen levels detected: {avg_spo2:.0f}%. Please sit down."
-            else:
-                summary_text = "Anomaly pattern detected in biometric telemetry. Keep calm and rest."
+        # Check event direct attributes
+        if 'steps' in event:
+            try:
+                steps = int(event['steps'])
+            except:
+                pass
+        if 'finger' in event:
+            finger_detected = str(event['finger']).lower() == 'true'
+            
+        # Check in batched readings if not in root event
+        if not steps and readings:
+            for r in readings:
+                if 'steps' in r:
+                    try:
+                        steps = int(r['steps'])
+                        break
+                    except:
+                        pass
+        if readings and 'finger' in readings[0]:
+            finger_detected = str(readings[0]['finger']).lower() == 'true'
+            
+        # Load models and predict only if finger is detected
+        if not finger_detected:
+            is_anomaly = False
+            overall_status = "Normal"
+            summary_text = "Wearable active. Place finger on sensor for vitals."
+            avg_hr = 0.0
+            avg_spo2 = 0.0
         else:
-            summary_text = "Your vitals are looking good."
+            # Load models and predict
+            load_models()
+            features_scaled = anomaly_scaler.transform(features_vector)
+            pred = anomaly_model.predict(features_scaled)
+            
+            # Predict values: -1 = Anomaly, 1 = Normal
+            is_anomaly = bool(pred[0] == -1)
+            
+            # Generate diagnostic text summary
+            overall_status = "Warning" if is_anomaly else "Normal"
+            if is_anomaly:
+                if avg_hr > 100 or avg_hr < 55:
+                    summary_text = f"Abnormal heart rate detected: {avg_hr:.0f} BPM. Rest recommended."
+                elif avg_spo2 < 95:
+                    summary_text = f"Low blood oxygen levels detected: {avg_spo2:.0f}%. Please sit down."
+                else:
+                    summary_text = "Anomaly pattern detected in biometric telemetry. Keep calm and rest."
+            else:
+                summary_text = "Your vitals are looking good."
             
         timestamp = readings[0].get('timestamp') if readings[0].get('timestamp') else boto3.client('dynamodb').system_clock_name
         # Use current time if none provided
@@ -164,6 +197,7 @@ def handler(event, context):
             'readingsCount': len(readings),
             'signalQuality': float_to_decimal(0.98),
             'activityLabel': activity_label,
+            'steps': int(steps),
             'isAnomaly': is_anomaly,
             'overallStatus': overall_status,
             'summary': summary_text

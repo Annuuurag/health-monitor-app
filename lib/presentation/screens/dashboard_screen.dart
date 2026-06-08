@@ -195,9 +195,9 @@ class DashboardScreen extends StatelessWidget {
                 footer: 'Status: Normal',
                 color: AppColors.teal,
               ),
-              const MetricCard(
+              MetricCard(
                 title: 'Step Count',
-                value: '12,973',
+                value: snapshot.stepCount.toString(),
                 unit: '',
                 footer: '7 day avg: 8,322',
                 color: AppColors.teal,

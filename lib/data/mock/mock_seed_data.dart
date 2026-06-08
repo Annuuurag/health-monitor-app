@@ -25,6 +25,7 @@ class MockSeedData {
         spo2Percent: spo2.toDouble(),
         bodyTempC: temperature,
         activityLabel: activities[index % activities.length],
+        stepCount: index * 150 + 200,
         signalQuality: 0.89 + (index % 3) * 0.02,
         source: 'mock-cloud',
       );
@@ -57,6 +58,7 @@ class MockSeedData {
       spo2Percent: latest.spo2Percent,
       bodyTempC: latest.bodyTempC,
       activityLabel: latest.activityLabel,
+      stepCount: latest.stepCount,
       signalQuality: latest.signalQuality,
       overallStatus: 'Warning',
       isAnomaly: true,

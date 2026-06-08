@@ -84,6 +84,20 @@ float g_ax, g_ay, g_az;
 float g_gx, g_gy, g_gz;
 float g_temp;
 
+// ── Edge Activity Classifier & Step Counter Globals ──────
+#define MAG_BUFFER_SIZE 15
+float magBuffer[MAG_BUFFER_SIZE];
+int magIndex = 0;
+bool magBufferFull = false;
+
+String currentActivity = "Resting";
+int stepCount = 0;
+float stepThreshold = 1.22;  // Peak threshold for a step in g
+bool aboveThreshold = false;
+unsigned long lastStepTime = 0;
+const unsigned long minStepInterval = 300; // Minimum ms between steps
+
+
 // ── MAX30102 ──────────────────────────────────────────────
 MAX30105 particleSensor;
 
@@ -288,6 +302,21 @@ const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
       <div style="text-align:center;font-size:0.65rem;color:#445;margin-top:6px;">°/s</div>
     </div>
 
+    <!-- Activity & Steps -->
+    <div class="card full">
+      <div class="card-title">🏃 Activity & Steps (Edge Classifier)</div>
+      <div class="row3">
+        <div class="mini">
+          <div class="label">Activity Status</div>
+          <div class="val" id="activity" style="color: #00d4ff; font-size: 1.8rem; font-weight: 700;">--</div>
+        </div>
+        <div class="mini">
+          <div class="label">Steps Counted</div>
+          <div class="val" id="steps" style="color: #88ff88; font-size: 1.8rem; font-weight: 700;">--</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <p class="footer">ESP32-C3 · MPU6050 + MAX30102</p>
@@ -307,6 +336,8 @@ const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
         document.getElementById('gx').textContent   = d.gx;
         document.getElementById('gy').textContent   = d.gy;
         document.getElementById('gz').textContent   = d.gz;
+        document.getElementById('activity').textContent = d.activityLabel;
+        document.getElementById('steps').textContent    = d.steps;
 
         const badge = document.getElementById('finger-badge');
         if (d.finger) {
@@ -342,7 +373,9 @@ void handleData() {
   json += "\"temp\":"   + String(g_temp, 1) + ",";
   json += "\"beatAvg\":" + String(beatAvg) + ",";
   json += "\"spo2Avg\":" + String(spo2Avg) + ",";
-  json += "\"finger\":"  + String(fingerDetected ? "true" : "false");
+  json += "\"finger\":"  + String(fingerDetected ? "true" : "false") + ",";
+  json += "\"activityLabel\":\"" + currentActivity + "\",";
+  json += "\"steps\":"   + String(stepCount);
   json += "}";
   server.send(200, "application/json", json);
 }
@@ -422,6 +455,58 @@ void readAndPrintMPU6050() {
   g_temp = (Tmp / 340.0) + 36.53;
 }
 
+float getMagnitudeRange() {
+  float minM = 999.0;
+  float maxM = -999.0;
+  int count = magBufferFull ? MAG_BUFFER_SIZE : magIndex;
+  if (count == 0) return 0.0;
+  for (int i = 0; i < count; i++) {
+    if (magBuffer[i] < minM) minM = magBuffer[i];
+    if (magBuffer[i] > maxM) maxM = magBuffer[i];
+  }
+  return maxM - minM;
+}
+
+void updateAccelerometerAndActivity() {
+  static unsigned long lastMpuRead = 0;
+  if (millis() - lastMpuRead >= 40) { // 25 Hz sampling rate
+    lastMpuRead = millis();
+    readAndPrintMPU6050();
+
+    // Calculate magnitude
+    float mag = sqrt(g_ax * g_ax + g_ay * g_ay + g_az * g_az);
+
+    // Store in circular buffer
+    magBuffer[magIndex] = mag;
+    magIndex = (magIndex + 1) % MAG_BUFFER_SIZE;
+    if (magIndex == 0) {
+      magBufferFull = true;
+    }
+
+    // Step counting (peak-detection with hysteresis)
+    if (mag > stepThreshold && !aboveThreshold) {
+      if (millis() - lastStepTime > minStepInterval) {
+        stepCount++;
+        lastStepTime = millis();
+        aboveThreshold = true;
+      }
+    } else if (mag < 1.08) {
+      aboveThreshold = false;
+    }
+
+    // Activity classification based on peak-to-peak difference (range)
+    float range = getMagnitudeRange();
+    if (range < 0.18) {
+      currentActivity = "Resting";
+    } else if (range < 0.60) {
+      currentActivity = "Walking";
+    } else {
+      currentActivity = "Jogging";
+    }
+  }
+}
+
+
 // ─────────────────────────────────────────────────────────
 void setup() {
   Serial.begin(115200);
@@ -465,6 +550,8 @@ void loop() {
   }
   client.loop();
 
+  updateAccelerometerAndActivity(); // Ensure accelerometer runs continuously
+
   // ── Shift buffer ──────────────────────────────────────
   for (byte i = 25; i < BUFFER_LENGTH; i++) {
     redBuffer[i - 25] = redBuffer[i];
@@ -474,8 +561,10 @@ void loop() {
   // ── Collect 25 new samples ────────────────────────────
   fingerDetected = true;
   for (byte i = 75; i < BUFFER_LENGTH; i++) {
-    while (!particleSensor.available())
+    while (!particleSensor.available()) {
       particleSensor.check();
+      updateAccelerometerAndActivity(); // Keep sampling accelerometer at 25Hz while waiting
+    }
 
     long irValue  = particleSensor.getIR();
     long redValue = particleSensor.getRed();
@@ -535,18 +624,18 @@ void loop() {
     }
   }
 
-  // ── Print both sensors together every cycle ───────────
-  readAndPrintMPU6050();
+  // Ensure accelerometer updates at loop end
+  updateAccelerometerAndActivity();
 
   // ── Publish telemetry to AWS IoT every 5 seconds ────────
   static unsigned long lastAwsPublish = 0;
-  if (fingerDetected && client.connected() && (millis() - lastAwsPublish >= 5000)) {
+  if (client.connected() && (millis() - lastAwsPublish >= 5000)) {
     lastAwsPublish = millis();
     
     String payload = "{";
     payload += "\"deviceId\":\"esp32-user-1\",";
-    payload += "\"hr\":" + String(beatAvg) + ",";
-    payload += "\"spo2\":" + String(spo2Avg) + ",";
+    payload += "\"hr\":" + String(fingerDetected ? beatAvg : 0) + ",";
+    payload += "\"spo2\":" + String(fingerDetected ? spo2Avg : 0) + ",";
     payload += "\"temp\":" + String(g_temp, 1) + ",";
     payload += "\"ax\":" + String(g_ax, 2) + ",";
     payload += "\"ay\":" + String(g_ay, 2) + ",";
@@ -554,7 +643,9 @@ void loop() {
     payload += "\"gx\":" + String(g_gx, 1) + ",";
     payload += "\"gy\":" + String(g_gy, 1) + ",";
     payload += "\"gz\":" + String(g_gz, 1) + ",";
-    payload += "\"activityLabel\":\"Resting\"";
+    payload += "\"activityLabel\":\"" + currentActivity + "\",";
+    payload += "\"steps\":" + String(stepCount) + ",";
+    payload += "\"finger\":" + String(fingerDetected ? "true" : "false");
     payload += "}";
     
     Serial.print("Publishing to AWS IoT: ");
