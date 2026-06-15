@@ -5,73 +5,70 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <WiFiClientSecure.h>
+#define MQTT_KEEPALIVE 60
 #include <PubSubClient.h>
 
-// ── WiFi Credentials ──────────────────────────────────────
-const char* ssid     = "Rezaur";
-const char* password = "12345677";
+#include "secrets.h"
 
-// ── AWS IoT Core Configuration ────────────────────────────
-// Replace with your actual AWS IoT Core endpoint:
-const char* AWS_IOT_ENDPOINT = "YOUR_AWS_IOT_ENDPOINT_HERE.iot.ap-south-1.amazonaws.com";
-const char* AWS_IOT_TOPIC    = "health/esp32-user-1/raw";
-
-// Root CA 1 Certificate
-const char* AWS_CERT_CA = R"EOF(
------BEGIN CERTIFICATE-----
-YOUR_AMAZON_ROOT_CA_1_HERE
------END CERTIFICATE-----
-)EOF";
-
-// Device Certificate
-const char* AWS_CERT_CRT = R"EOF(
------BEGIN CERTIFICATE-----
-YOUR_DEVICE_CERTIFICATE_HERE
------END CERTIFICATE-----
-)EOF";
-
-// Device Private Key
-const char* AWS_CERT_PRIVATE = R"EOF(
------BEGIN RSA PRIVATE KEY-----
-YOUR_DEVICE_PRIVATE_KEY_HERE
------END RSA PRIVATE KEY-----
-)EOF";
 
 WebServer server(80);
 WiFiClientSecure net = WiFiClientSecure();
 PubSubClient client(net);
 
-#define SDA_PIN 4
-#define SCL_PIN 5
+#define SDA_PIN 21
+#define SCL_PIN 22
+
+#include <time.h>
+
+// ── NTP Time Synchronization Helper ───────────────────────
+void syncNTP() {
+  // Sync time with NTP server (GMT+5:30 offset)
+  configTime(3600 * 5.5, 0, "pool.ntp.org", "time.nist.gov");
+  Serial.print("Synchronizing time via NTP");
+  time_t now = time(nullptr);
+  int retry = 0;
+  while (now < 1700000000 && retry < 30) {
+    delay(500);
+    Serial.print(".");
+    now = time(nullptr);
+    retry++;
+  }
+  if (now >= 1700000000) {
+    Serial.println(" Done!");
+    struct tm timeinfo;
+    gmtime_r(&now, &timeinfo);
+    Serial.print("Current UTC Time: ");
+    Serial.println(asctime(&timeinfo));
+  } else {
+    Serial.println(" Failed (Timeout).");
+  }
+}
 
 // ── AWS IoT Connection Helper ─────────────────────────────
 void connectAWS() {
   if (WiFi.status() != WL_CONNECTED) {
     return;
   }
-  
-  static bool certsSet = false;
-  if (!certsSet) {
-    net.setCACert(AWS_CERT_CA);
-    net.setCertificate(AWS_CERT_CRT);
-    net.setPrivateKey(AWS_CERT_PRIVATE);
-    client.setServer(AWS_IOT_ENDPOINT, 8883);
-    certsSet = true;
-  }
 
-  int retries = 0;
-  while (!client.connected() && retries < 3) {
-    Serial.print("Connecting to AWS IoT Core...");
-    String clientId = "ESP32-HealthMonitor-" + String(WiFi.macAddress());
-    if (client.connect(clientId.c_str())) {
-      Serial.println(" Connected!");
-    } else {
-      Serial.print(" failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" - trying again in 2 seconds");
-      delay(2000);
-      retries++;
-    }
+  // Ensure any previous stale connection state or socket is fully cleaned up
+  if (client.connected()) {
+    return;
+  }
+  client.disconnect();
+  net.stop();
+  
+  net.setCACert(AWS_CERT_CA); // Use the Root CA certificate now that time is synchronized
+  net.setCertificate(AWS_CERT_CRT);
+  net.setPrivateKey(AWS_CERT_PRIVATE);
+  client.setServer(AWS_IOT_ENDPOINT, 8883);
+
+  Serial.print("Connecting to AWS IoT Core...");
+  String clientId = "ESP32-HealthMonitor-" + String(WiFi.macAddress());
+  if (client.connect(clientId.c_str())) {
+    Serial.println(" Connected!");
+  } else {
+    Serial.print(" failed, rc=");
+    Serial.println(client.state());
   }
 }
 
@@ -533,8 +530,18 @@ void setup() {
   server.on("/data", handleData);
   server.begin();
 
-  // ── Connect to AWS IoT Core ───────────────────────────
-  connectAWS();
+  // ── Sync NTP Time ─────────────────────────────────────
+  syncNTP();
+
+  // ── Connect to AWS IoT Core (Initial attempts) ────────
+  int attempts = 0;
+  while (!client.connected() && attempts < 3) {
+    connectAWS();
+    if (!client.connected()) {
+      delay(2000);
+    }
+    attempts++;
+  }
 
   Serial.println("Both sensors ready!");
   Serial.println("Place finger on MAX30102 for heart rate and SpO2.");
@@ -545,8 +552,12 @@ void loop() {
   server.handleClient();  // handle web requests
 
   // ── AWS Connection Check ──────────────────────────────
+  static unsigned long lastAwsReconnect = 0;
   if (!client.connected() && WiFi.status() == WL_CONNECTED) {
-    connectAWS();
+    if (millis() - lastAwsReconnect >= 10000) {
+      lastAwsReconnect = millis();
+      connectAWS();
+    }
   }
   client.loop();
 
@@ -564,6 +575,7 @@ void loop() {
     while (!particleSensor.available()) {
       particleSensor.check();
       updateAccelerometerAndActivity(); // Keep sampling accelerometer at 25Hz while waiting
+      client.loop(); // Keep MQTT connection alive and respond to pings
     }
 
     long irValue  = particleSensor.getIR();

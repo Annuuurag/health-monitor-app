@@ -75,3 +75,8 @@ ML_models/**/WISDM_ar_v1.1_raw.txt
 *.png
 *.jpg
 *.jpeg
+
+# Local Hardware Security Credentials
+**/secrets.h
+!**/secrets.h.example
+

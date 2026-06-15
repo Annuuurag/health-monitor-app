@@ -18,12 +18,35 @@ SCALER_PATH = os.path.join(os.path.dirname(__file__), 'anomaly_scaler.pkl')
 anomaly_model = None
 anomaly_scaler = None
 
+# Define EnsembleDetector class so it can be resolved during unpickling
+class EnsembleDetector:
+    def __init__(self, models):
+        self.models = models
+
+    def predict(self, X):
+        preds = np.stack([m.predict(X) for m in self.models], axis=1)
+        anomaly_votes = np.sum(preds == -1, axis=1)
+        final_preds = np.where(anomaly_votes >= 2, -1, 1)
+        return final_preds
+
+    def decision_function(self, X):
+        if_scores = self.models[0].decision_function(X)
+        svm_scores = self.models[1].score_samples(X)
+        svm_scores_scaled = (svm_scores - svm_scores.mean()) / (svm_scores.std() + 1e-8) * 0.1
+        return (if_scores + svm_scores_scaled) / 2.0
+
+class CustomUnpickler(pickle.Unpickler):
+    def find_class(self, module, name):
+        if name == 'EnsembleDetector':
+            return EnsembleDetector
+        return super().find_class(module, name)
+
 def load_models():
     global anomaly_model, anomaly_scaler
     if anomaly_model is None or anomaly_scaler is None:
         print("Loading anomaly detection models from disk...")
         with open(MODEL_PATH, 'rb') as f:
-            anomaly_model = pickle.load(f)
+            anomaly_model = CustomUnpickler(f).load()
         with open(SCALER_PATH, 'rb') as f:
             anomaly_scaler = pickle.load(f)
 
@@ -178,7 +201,7 @@ def handler(event, context):
             else:
                 summary_text = "Your vitals are looking good."
             
-        timestamp = readings[0].get('timestamp') if readings[0].get('timestamp') else boto3.client('dynamodb').system_clock_name
+        timestamp = readings[0].get('timestamp') if readings[0].get('timestamp') else None
         # Use current time if none provided
         if not timestamp or timestamp == 'system_clock':
             from datetime import datetime
