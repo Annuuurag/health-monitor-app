@@ -639,9 +639,9 @@ void loop() {
   // Ensure accelerometer updates at loop end
   updateAccelerometerAndActivity();
 
-  // ── Publish telemetry to AWS IoT every 5 seconds ────────
+  // ── Publish telemetry to AWS IoT every 1.5 seconds ──────
   static unsigned long lastAwsPublish = 0;
-  if (client.connected() && (millis() - lastAwsPublish >= 5000)) {
+  if (client.connected() && (millis() - lastAwsPublish >= 1500)) {
     lastAwsPublish = millis();
     
     String payload = "{";

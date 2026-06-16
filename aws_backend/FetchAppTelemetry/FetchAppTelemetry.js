@@ -26,19 +26,20 @@ exports.handler = async (event) => {
 
         // Format for the Flutter App
         const responseData = items.map(item => ({
-            deviceId: item.deviceId,
-            timestamp: item.timestamp,
-            heartRateBpm: item.avgHeartRate,
-            spo2Percent: item.avgSpo2,
-            bodyTempC: item.avgTemp,
-            readingsCount: item.readingsCount || 1,
-            signalQuality: item.signalQuality || 0.95,
-            activityLabel: item.activityLabel || 'Resting',
-            stepCount: item.steps !== undefined ? Number(item.steps) : 0,
-            source: 'AWS Backend',
-            isAnomaly: item.isAnomaly !== undefined ? item.isAnomaly : false,
-            overallStatus: item.overallStatus || 'Normal',
-            summary: item.summary || 'Your vitals are looking good.'
+            deviceId:       item.deviceId,
+            timestamp:      item.timestamp,
+            heartRateBpm:   item.avgHeartRate  ?? 0,
+            spo2Percent:    item.avgSpo2       ?? 0,
+            bodyTempC:      item.avgTemp       ?? 0,
+            readingsCount:  item.readingsCount ?? 1,
+            signalQuality:  item.signalQuality ?? 0.95,
+            activityLabel:  item.activityLabel ?? 'Resting',
+            stepCount:      item.steps         != null ? Number(item.steps) : 0,
+            fingerDetected: item.fingerDetected ?? false,
+            source:         'AWS Backend',
+            isAnomaly:      item.isAnomaly     ?? false,
+            overallStatus:  item.overallStatus ?? 'Normal',
+            summary:        item.summary       ?? 'Vitals look good.',
         }));
 
         const latest = responseData.length > 0 ? responseData[0] : null;

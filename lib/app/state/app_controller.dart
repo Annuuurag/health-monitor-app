@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../domain/models/alert_event.dart';
@@ -43,6 +44,7 @@ class AppController extends ChangeNotifier {
   bool _initialized = false;
   String? _errorMessage;
   int _selectedTab = 0;
+  Timer? _pollingTimer;
 
   HealthSnapshot? _snapshot;
   List<TelemetrySample> _samples = const [];
@@ -82,6 +84,7 @@ class AppController extends ChangeNotifier {
       await _loadAll();
       await _syncReminderNotifications();
       _errorMessage = null;
+      _startPolling();
     } catch (_) {
       _errorMessage = 'Failed to initialize the health monitor app.';
     } finally {
@@ -254,5 +257,26 @@ class AppController extends ChangeNotifier {
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();
+  }
+
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      try {
+        final snapshot = await telemetryRepository.getLatestSnapshot();
+        final samples = await telemetryRepository.getRecentSamples();
+        _snapshot = snapshot;
+        _samples = samples;
+        notifyListeners();
+      } catch (e) {
+        // Silently ignore background polling errors
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
   }
 }

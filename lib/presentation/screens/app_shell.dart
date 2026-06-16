@@ -15,21 +15,30 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pages = <Widget>[
-      DashboardScreen(controller: controller),
-      ReportsScreen(controller: controller),
-      CareScreen(controller: controller),
-      InsightsScreen(controller: controller),
-      ProfileScreen(controller: controller),
-    ];
+    // AnimatedBuilder subscribes to AppController (a ChangeNotifier).
+    // Every time the polling timer fires and calls notifyListeners(),
+    // this builder re-runs and the active screen gets fresh data.
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final pages = <Widget>[
+          DashboardScreen(controller: controller),
+          ReportsScreen(controller: controller),
+          CareScreen(controller: controller),
+          InsightsScreen(controller: controller),
+          ProfileScreen(controller: controller),
+        ];
 
-    return Scaffold(
-      extendBody: true,
-      body: pages[controller.selectedTab],
-      bottomNavigationBar: AppBottomNavigation(
-        currentIndex: controller.selectedTab,
-        onTap: controller.selectTab,
-      ),
+        return Scaffold(
+          extendBody: true,
+          body: pages[controller.selectedTab],
+          bottomNavigationBar: AppBottomNavigation(
+            currentIndex: controller.selectedTab,
+            onTap: controller.selectTab,
+          ),
+        );
+      },
     );
   }
 }
+

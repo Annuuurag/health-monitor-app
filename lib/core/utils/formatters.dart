@@ -14,10 +14,13 @@ String formatHourLabel(DateTime dateTime) {
 }
 
 String formatShortDateTime(DateTime dateTime) {
-  final day = dateTime.day.toString().padLeft(2, '0');
-  final month = dateTime.month.toString().padLeft(2, '0');
+  // Convert UTC timestamp to IST (UTC+5:30)
+  final ist = dateTime.toUtc().add(const Duration(hours: 5, minutes: 30));
+  final day = ist.day.toString().padLeft(2, '0');
+  final month = ist.month.toString().padLeft(2, '0');
   final time = formatTimeOfDay(
-    TimeOfDay(hour: dateTime.hour, minute: dateTime.minute),
+    TimeOfDay(hour: ist.hour, minute: ist.minute),
   );
   return '$day/$month • $time';
 }
+
