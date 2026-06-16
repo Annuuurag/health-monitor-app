@@ -5,6 +5,7 @@ import '../../app/theme/app_theme.dart';
 import '../../core/app_colors.dart';
 import '../../core/widgets/screen_scaffold.dart';
 import '../../domain/models/insight_result.dart';
+import '../../domain/models/user_profile.dart';
 
 class InsightsScreen extends StatefulWidget {
   const InsightsScreen({super.key, required this.controller});
@@ -21,11 +22,24 @@ class _InsightsScreenState extends State<InsightsScreen> {
   String? _assessmentError;
 
   Future<void> _startAssessment() async {
+    double initialMaxHr = 150.0;
+    if (widget.controller.samples.isNotEmpty) {
+      final hrSamples = widget.controller.samples
+          .where((s) => s.heartRateBpm > 0)
+          .map((s) => s.heartRateBpm);
+      if (hrSamples.isNotEmpty) {
+        initialMaxHr = hrSamples.reduce((a, b) => a > b ? a : b);
+      }
+    }
+
     final Map<String, dynamic>? clinicalData = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const _AssessmentFormBottomSheet(),
+      builder: (context) => _AssessmentFormBottomSheet(
+        userProfile: widget.controller.userProfile,
+        initialMaxHr: initialMaxHr,
+      ),
     );
 
     if (clinicalData == null) return;
@@ -41,6 +55,8 @@ class _InsightsScreenState extends State<InsightsScreen> {
       setState(() {
         _assessmentResult = result;
       });
+      // Refresh to update the general insights list (Disease Prediction card)
+      await widget.controller.refresh();
     } catch (e) {
       setState(() {
         _assessmentError = 'Assessment failed. Please check your internet connection.';
@@ -398,7 +414,13 @@ class _InsightCard extends StatelessWidget {
 }
 
 class _AssessmentFormBottomSheet extends StatefulWidget {
-  const _AssessmentFormBottomSheet();
+  const _AssessmentFormBottomSheet({
+    required this.userProfile,
+    required this.initialMaxHr,
+  });
+
+  final UserProfile userProfile;
+  final double initialMaxHr;
 
   @override
   State<_AssessmentFormBottomSheet> createState() => _AssessmentFormBottomSheetState();
@@ -407,27 +429,28 @@ class _AssessmentFormBottomSheet extends StatefulWidget {
 class _AssessmentFormBottomSheetState extends State<_AssessmentFormBottomSheet> {
   final _formKey = GlobalKey<FormState>();
 
-  // Form Field values with default clinical averages
-  double _age = 50;
-  double _sex = 1.0; // Male
+  // Form Field values
+  late double _age;
+  late double _sex;
   double _cp = 3.0; // Non-anginal
   final _bpController = TextEditingController(text: '125');
   final _cholController = TextEditingController(text: '220');
-  double _fbs = 0.0; // <= 120
-  double _restecg = 0.0; // Normal
-  final _hrController = TextEditingController(text: '145');
+  final _hrController = TextEditingController();
   double _exang = 0.0; // No
-  final _oldpeakController = TextEditingController(text: '0.8');
-  double _slope = 1.0; // Upsloping
-  double _ca = 0.0; // 0 vessels
-  double _thal = 3.0; // Normal
+
+  @override
+  void initState() {
+    super.initState();
+    _age = widget.userProfile.age.toDouble();
+    _sex = widget.userProfile.gender.toLowerCase() == 'female' ? 0.0 : 1.0;
+    _hrController.text = widget.initialMaxHr.round().toString();
+  }
 
   @override
   void dispose() {
     _bpController.dispose();
     _cholController.dispose();
     _hrController.dispose();
-    _oldpeakController.dispose();
     super.dispose();
   }
 
@@ -440,14 +463,14 @@ class _AssessmentFormBottomSheetState extends State<_AssessmentFormBottomSheet> 
       'cp': _cp,
       'trestbps': double.parse(_bpController.text),
       'chol': double.parse(_cholController.text),
-      'fbs': _fbs,
-      'restecg': _restecg,
+      'fbs': 0.0,
+      'restecg': 0.0,
       'thalach': double.parse(_hrController.text),
       'exang': _exang,
-      'oldpeak': double.parse(_oldpeakController.text),
-      'slope': _slope,
-      'ca': _ca,
-      'thal': _thal,
+      'oldpeak': 0.0,
+      'slope': 1.0,
+      'ca': 0.0,
+      'thal': 3.0,
     };
 
     Navigator.of(context).pop(clinicalData);
@@ -459,7 +482,7 @@ class _AssessmentFormBottomSheetState extends State<_AssessmentFormBottomSheet> 
     final cardBg = isDark ? AppColors.darkCard : Colors.white;
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
+      height: MediaQuery.of(context).size.height * 0.70,
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -487,7 +510,7 @@ class _AssessmentFormBottomSheetState extends State<_AssessmentFormBottomSheet> 
           ),
           const SizedBox(height: 4),
           Text(
-            'All features match Cleveland clinical indicators',
+            'Form simplified using standard clinical defaults',
             style: TextStyle(fontSize: 12, color: AppColors.secondaryText(context)),
           ),
           const SizedBox(height: 16),
@@ -564,31 +587,6 @@ class _AssessmentFormBottomSheetState extends State<_AssessmentFormBottomSheet> 
                     ),
                     const SizedBox(height: 16),
 
-                    // Fasting Blood Sugar
-                    _buildDropdownRow<double>(
-                      label: 'Fasting Blood Sugar',
-                      value: _fbs,
-                      items: const [
-                        DropdownMenuItem(value: 0.0, child: Text('<= 120 mg/dl')),
-                        DropdownMenuItem(value: 1.0, child: Text('> 120 mg/dl')),
-                      ],
-                      onChanged: (val) => setState(() => _fbs = val!),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Resting ECG
-                    _buildDropdownRow<double>(
-                      label: 'Resting ECG',
-                      value: _restecg,
-                      items: const [
-                        DropdownMenuItem(value: 0.0, child: Text('Normal')),
-                        DropdownMenuItem(value: 1.0, child: Text('ST-T Wave Abnormality')),
-                        DropdownMenuItem(value: 2.0, child: Text('LV Hypertrophy')),
-                      ],
-                      onChanged: (val) => setState(() => _restecg = val!),
-                    ),
-                    const SizedBox(height: 16),
-
                     // Max Heart Rate
                     _buildTextFieldRow(
                       label: 'Max Heart Rate',
@@ -612,60 +610,6 @@ class _AssessmentFormBottomSheetState extends State<_AssessmentFormBottomSheet> 
                         DropdownMenuItem(value: 1.0, child: Text('Yes')),
                       ],
                       onChanged: (val) => setState(() => _exang = val!),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // ST Depression (oldpeak)
-                    _buildTextFieldRow(
-                      label: 'ST Depression',
-                      controller: _oldpeakController,
-                      suffix: 'mm',
-                      validator: (val) {
-                        if (val == null || val.isEmpty) return 'Required';
-                        final num = double.tryParse(val);
-                        if (num == null || num < 0.0 || num > 10.0) return 'Enter 0.0-10.0';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Slope of peak exercise ST segment
-                    _buildDropdownRow<double>(
-                      label: 'ST Peak Slope',
-                      value: _slope,
-                      items: const [
-                        DropdownMenuItem(value: 1.0, child: Text('Upsloping')),
-                        DropdownMenuItem(value: 2.0, child: Text('Flat')),
-                        DropdownMenuItem(value: 3.0, child: Text('Downsloping')),
-                      ],
-                      onChanged: (val) => setState(() => _slope = val!),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Number of major vessels colored by fluoroscopy
-                    _buildDropdownRow<double>(
-                      label: 'Major Vessels (ca)',
-                      value: _ca,
-                      items: const [
-                        DropdownMenuItem(value: 0.0, child: Text('0')),
-                        DropdownMenuItem(value: 1.0, child: Text('1')),
-                        DropdownMenuItem(value: 2.0, child: Text('2')),
-                        DropdownMenuItem(value: 3.0, child: Text('3')),
-                      ],
-                      onChanged: (val) => setState(() => _ca = val!),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Thalassemia
-                    _buildDropdownRow<double>(
-                      label: 'Thalassemia',
-                      value: _thal,
-                      items: const [
-                        DropdownMenuItem(value: 3.0, child: Text('Normal')),
-                        DropdownMenuItem(value: 6.0, child: Text('Fixed Defect')),
-                        DropdownMenuItem(value: 7.0, child: Text('Reversible Defect')),
-                      ],
-                      onChanged: (val) => setState(() => _thal = val!),
                     ),
                     const SizedBox(height: 32),
 

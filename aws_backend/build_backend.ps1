@@ -32,8 +32,8 @@ New-Item -ItemType Directory -Path $predictBuildDir -Force | Out-Null
 # 2. Install dependencies for IngestIoTData (numpy, scikit-learn)
 Write-Host "[2/5] Downloading Linux wheels for IngestIoTData (scikit-learn, numpy)..." -ForegroundColor Yellow
 & $pipPath install `
-    "scikit-learn==1.4.2" `
-    "numpy==1.26.4" `
+    "scikit-learn>=1.4.2" `
+    "numpy>=2.0.0" `
     --platform "manylinux2014_x86_64" `
     --only-binary=:all: `
     --target $ingestBuildDir `
@@ -42,8 +42,8 @@ Write-Host "[2/5] Downloading Linux wheels for IngestIoTData (scikit-learn, nump
 # 3. Install dependencies for PredictDisease (numpy, scikit-learn)
 Write-Host "[3/5] Downloading Linux wheels for PredictDisease (scikit-learn, numpy)..." -ForegroundColor Yellow
 & $pipPath install `
-    "scikit-learn==1.4.2" `
-    "numpy==1.26.4" `
+    "scikit-learn>=1.4.2" `
+    "numpy>=2.0.0" `
     --platform "manylinux2014_x86_64" `
     --only-binary=:all: `
     --target $predictBuildDir `
@@ -61,14 +61,59 @@ Copy-Item (Join-Path $projectDir "ML_models\Anomaly_Detection\anomaly_scaler.pkl
 Copy-Item (Join-Path $projectDir "ML_models\Disease_Prediction\prediction_model.pkl") $predictBuildDir
 Copy-Item (Join-Path $projectDir "ML_models\Disease_Prediction\heart_scaler.pkl") $predictBuildDir
 
-# 6. Remove numpy and pandas to stay under the 262MB unzipped size limit
-Write-Host "[6/6] Removing numpy and pandas (will be loaded from AWS Lambda Layer)..." -ForegroundColor Yellow
-Remove-Item (Join-Path $ingestBuildDir "numpy") -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item (Join-Path $ingestBuildDir "numpy-*.dist-info") -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item (Join-Path $predictBuildDir "numpy") -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item (Join-Path $predictBuildDir "numpy-*.dist-info") -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item (Join-Path $predictBuildDir "pandas") -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item (Join-Path $predictBuildDir "pandas-*.dist-info") -Recurse -Force -ErrorAction SilentlyContinue
+# 6. Keep numpy (needed since we removed the layer) but prune bloat
+# (tests, __pycache__, type stubs, documentation) to fit under the 250MB limit.
+Write-Host "[6/6] Pruning unnecessary files (tests, cache, docs, stubs) to minimize bundle size..." -ForegroundColor Yellow
+
+function Clean-PackageBloat($dir) {
+    Write-Host "  Cleaning $dir..."
+    
+    # 1. Delete all folders named '__pycache__'
+    Get-ChildItem -Path $dir -Recurse -Directory | Where-Object { 
+        $_.Name -eq "__pycache__" 
+    } | ForEach-Object {
+        Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # 3. Delete all files with extension .pyi (type stubs)
+    Get-ChildItem -Path $dir -Recurse -File -Filter "*.pyi" | ForEach-Object {
+        Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+    }
+
+    # 4. Delete documentation files (.txt, .md, .rst, .html)
+    Get-ChildItem -Path $dir -Recurse -File | Where-Object {
+        $_.Extension -eq ".txt" -or $_.Extension -eq ".md" -or $_.Extension -eq ".rst" -or $_.Extension -eq ".html"
+    } | ForEach-Object {
+        # Do not delete the script files or requirements.txt
+        if ($_.Name -ne "requirements.txt" -and $_.Name -ne "PredictDisease.py" -and $_.Name -ne "IngestIoTData.py") {
+            Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    # 5. Delete .dist-info directories
+    Get-ChildItem -Path $dir -Recurse -Directory | Where-Object {
+        $_.Name -like "*.dist-info"
+    } | ForEach-Object {
+        Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # 6. Delete pandas if present (neither function uses pandas)
+    $pandasDir = Join-Path $dir "pandas"
+    if (Test-Path $pandasDir) {
+        Remove-Item -Path $pandasDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    $pandasInfo = Join-Path $dir "pandas-*"
+    if (Test-Path $pandasInfo) {
+        Remove-Item -Path $pandasInfo -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    $pandasLibs = Join-Path $dir "pandas.libs"
+    if (Test-Path $pandasLibs) {
+        Remove-Item -Path $pandasLibs -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Clean-PackageBloat $ingestBuildDir
+Clean-PackageBloat $predictBuildDir
 
 Write-Host "==========================================================" -ForegroundColor Green
 Write-Host "[SUCCESS] Lambda packages built and ready in 'aws_backend/build/'" -ForegroundColor Green

@@ -4,16 +4,99 @@ import '../../app/state/app_controller.dart';
 import '../../app/theme/app_theme.dart';
 import '../../core/app_colors.dart';
 import '../../core/widgets/screen_scaffold.dart';
+import '../../domain/models/telemetry_sample.dart';
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key, required this.controller});
 
   final AppController controller;
 
+  int _calculateStepsForSamples(List<TelemetrySample> daySamples) {
+    if (daySamples.isEmpty) return 0;
+
+    // Sort chronologically (oldest first)
+    final sorted = List<TelemetrySample>.from(daySamples)
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    int total = 0;
+    int prevVal = 0;
+
+    for (int i = 0; i < sorted.length; i++) {
+      final curVal = sorted[i].stepCount;
+      if (i == 0) {
+        total = curVal;
+      } else {
+        if (curVal >= prevVal) {
+          total += (curVal - prevVal);
+        } else {
+          // Reset detected
+          total += curVal;
+        }
+      }
+      prevVal = curVal;
+    }
+    return total;
+  }
+
   @override
   Widget build(BuildContext context) {
     final textColor = AppColors.primaryText(context);
     final secondary = AppColors.secondaryText(context);
+
+    // Calculate daily step counts for the past 7 days (including today) in IST
+    final nowIst = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+    final todayDate = DateTime(nowIst.year, nowIst.month, nowIst.day);
+
+    final List<DateTime> past7Days = List.generate(7, (i) => todayDate.subtract(Duration(days: 6 - i)));
+
+    final displayBars = <Widget>[];
+    if (controller.samples.isEmpty) {
+      // Fallback mock step trend bars if no data is loaded yet
+      const mockBars = [
+        _TrendBar(heightFactor: 0.18, color: AppColors.amber, label: '900'),
+        _TrendBar(heightFactor: 0.30, color: AppColors.teal, label: '1.5k'),
+        _TrendBar(heightFactor: 0.56, color: AppColors.teal, label: '2.8k'),
+        _TrendBar(heightFactor: 0.24, color: AppColors.amber, label: '1.2k'),
+        _TrendBar(heightFactor: 0.72, color: AppColors.teal, label: '3.6k'),
+        _TrendBar(heightFactor: 0.88, color: AppColors.teal, label: '4.4k'),
+        _TrendBar(heightFactor: 0.48, color: AppColors.teal, label: '2.4k'),
+      ];
+      displayBars.addAll(mockBars);
+    } else {
+      for (final day in past7Days) {
+        // Filter samples for this specific day in IST
+        final daySamples = controller.samples.where((s) {
+          final ist = s.timestamp.toUtc().add(const Duration(hours: 5, minutes: 30));
+          return DateTime(ist.year, ist.month, ist.day) == day;
+        }).toList();
+
+        final steps = _calculateStepsForSamples(daySamples);
+
+        // Normalise steps (relative to a 5,000 steps daily target)
+        final double heightFactor = (steps / 5000.0).clamp(0.08, 1.0);
+        // Teal for active day (>= 2500 steps), amber for low activity
+        final color = steps >= 2500 ? AppColors.teal : AppColors.amber;
+
+        String label;
+        if (steps >= 1000) {
+          label = '${(steps / 1000.0).toStringAsFixed(1)}k';
+        } else {
+          label = steps.toString();
+        }
+
+        displayBars.add(
+          _TrendBar(
+            heightFactor: heightFactor,
+            color: color,
+            label: label,
+          ),
+        );
+      }
+    }
+
+    final chartSubtitle = controller.samples.isEmpty
+        ? 'Showing baseline step count trend.'
+        : 'Daily step count trends for the past 7 days.';
 
     return ScreenScaffold(
       title: 'Reports',
@@ -36,7 +119,7 @@ class ReportsScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'This chart area is ready for AWS-backed history in the next phase.',
+                  chartSubtitle,
                   style: TextStyle(color: secondary),
                 ),
                 const SizedBox(height: 18),
@@ -49,17 +132,9 @@ class ReportsScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   padding: const EdgeInsets.all(16),
-                  child: const Row(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      _TrendBar(heightFactor: 0.36, color: AppColors.teal),
-                      _TrendBar(heightFactor: 0.52, color: AppColors.teal),
-                      _TrendBar(heightFactor: 0.42, color: AppColors.amber),
-                      _TrendBar(heightFactor: 0.64, color: AppColors.teal),
-                      _TrendBar(heightFactor: 0.78, color: AppColors.teal),
-                      _TrendBar(heightFactor: 0.48, color: AppColors.amber),
-                      _TrendBar(heightFactor: 0.58, color: AppColors.teal),
-                    ],
+                    children: displayBars,
                   ),
                 ),
               ],
@@ -164,24 +239,40 @@ class ReportsScreen extends StatelessWidget {
 }
 
 class _TrendBar extends StatelessWidget {
-  const _TrendBar({required this.heightFactor, required this.color});
+  const _TrendBar({
+    required this.heightFactor,
+    required this.color,
+    required this.label,
+  });
 
   final double heightFactor;
   final Color color;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: Container(
-          height: 86 * heightFactor,
-          margin: const EdgeInsets.symmetric(horizontal: 6),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(18),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: color.withValues(alpha: 0.9),
+            ),
           ),
-        ),
+          const SizedBox(height: 4),
+          Container(
+            height: 70 * heightFactor,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        ],
       ),
     );
   }

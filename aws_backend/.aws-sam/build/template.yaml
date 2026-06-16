@@ -122,8 +122,6 @@ Resources:
       Handler: IngestIoTData.handler
       Runtime: python3.12
       MemorySize: 512
-      Layers:
-      - arn:aws:lambda:ap-south-1:336392948345:layer:AWSSDKPandas-Python312:12
       Policies:
       - DynamoDBCrudPolicy:
           TableName:
@@ -141,8 +139,6 @@ Resources:
       Handler: PredictDisease.handler
       Runtime: python3.12
       MemorySize: 512
-      Layers:
-      - arn:aws:lambda:ap-south-1:336392948345:layer:AWSSDKPandas-Python312:12
       Events:
         PostDiseasePrediction:
           Type: Api

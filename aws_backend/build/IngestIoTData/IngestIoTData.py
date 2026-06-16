@@ -97,28 +97,19 @@ def handler(event, context):
             return {'statusCode': 200, 'body': 'No telemetry data to process'}
 
         # Calculate averages and lists for statistics
-        # Only include HR/SpO2 from readings where finger is present AND value > 0
-        # (ESP sends hr=0, spo2=0 when no finger detected — must exclude these)
         hr_list, spo2_list, temp_list = [], [], []
         
         for r in readings:
-            finger_on = str(r.get('finger', 'true')).lower() == 'true'
-            hr_val = float(r['hr']) if r.get('hr') is not None else 0.0
-            spo2_val = float(r['spo2']) if r.get('spo2') is not None else 0.0
-
-            # Only average HR / SpO2 when finger is detected and value is non-zero
-            if finger_on and hr_val > 0:
-                hr_list.append(hr_val)
-            if finger_on and spo2_val > 0:
-                spo2_list.append(spo2_val)
+            if r.get('hr') is not None:
+                hr_list.append(float(r['hr']))
+            if r.get('spo2') is not None:
+                spo2_list.append(float(r['spo2']))
             if r.get('temp') is not None:
                 temp_list.append(float(r['temp']))
                 
-        # Convert numpy types to Python native types for DynamoDB compatibility
-        # (numpy.float64 comparisons return numpy.bool_ which DynamoDB cannot serialize)
-        avg_hr   = float(np.mean(hr_list))   if hr_list   else 0.0
-        avg_spo2 = float(np.mean(spo2_list)) if spo2_list else 0.0
-        avg_temp = float(np.mean(temp_list)) if temp_list else 36.5
+        avg_hr = np.mean(hr_list) if hr_list else 72.0
+        avg_spo2 = np.mean(spo2_list) if spo2_list else 97.0
+        avg_temp = np.mean(temp_list) if temp_list else 36.5
         
         # Calculate HRV (RMSSD of heart rate if multiple readings, else baseline)
         if len(hr_list) > 1:
@@ -158,32 +149,29 @@ def handler(event, context):
         ]])
         
         # Extract steps and finger detection status
-        # Default finger_detected to False — only set True if explicitly sent as true
         steps = 0
-        finger_detected = False
+        finger_detected = True
         
-        # Prefer reading from the sensor data dict (readings[0])
-        if readings:
-            r0 = readings[0]
-            finger_val = r0.get('finger')
-            if finger_val is not None:
-                finger_detected = (finger_val is True) or (str(finger_val).lower() == 'true')
-            # Fall back to checking root event
-            elif 'finger' in event:
-                fv = event['finger']
-                finger_detected = (fv is True) or (str(fv).lower() == 'true')
+        # Check event direct attributes
+        if 'steps' in event:
+            try:
+                steps = int(event['steps'])
+            except:
+                pass
+        if 'finger' in event:
+            finger_detected = str(event['finger']).lower() == 'true'
             
-            # Steps: prefer root event (ESP sends it at root level)
-            if 'steps' in event:
-                try:
-                    steps = int(event['steps'])
-                except:
-                    pass
-            elif 'steps' in r0:
-                try:
-                    steps = int(r0['steps'])
-                except:
-                    pass
+        # Check in batched readings if not in root event
+        if not steps and readings:
+            for r in readings:
+                if 'steps' in r:
+                    try:
+                        steps = int(r['steps'])
+                        break
+                    except:
+                        pass
+        if readings and 'finger' in readings[0]:
+            finger_detected = str(readings[0]['finger']).lower() == 'true'
             
         # Load models and predict only if finger is detected
         if not finger_detected:
@@ -192,37 +180,26 @@ def handler(event, context):
             summary_text = "Wearable active. Place finger on sensor for vitals."
             avg_hr = 0.0
             avg_spo2 = 0.0
-        elif avg_hr == 0.0 or avg_spo2 == 0.0:
-            # Finger detected but beatAvg/spo2Avg not yet computed (needs ~8 beats)
-            is_anomaly = False
-            overall_status = "Normal"
-            summary_text = "Finger detected. Measuring heart rate and SpO2, hold still..."
         else:
-            # Valid finger + valid readings — try ML anomaly model, fall back to rules
-            try:
-                load_models()
-                features_scaled = anomaly_scaler.transform(features_vector)
-                pred = anomaly_model.predict(features_scaled)
-                is_anomaly = bool(pred[0] == -1)
-                print(f"ML model prediction: {'Anomaly' if is_anomaly else 'Normal'}")
-            except Exception as ml_err:
-                # ML model failed — use simple threshold rules instead
-                print(f"ML model error (using rule-based fallback): {ml_err}")
-                is_anomaly = bool(avg_hr < 50 or avg_hr > 120 or avg_spo2 < 94)
-
-            # Generate summary text
+            # Load models and predict
+            load_models()
+            features_scaled = anomaly_scaler.transform(features_vector)
+            pred = anomaly_model.predict(features_scaled)
+            
+            # Predict values: -1 = Anomaly, 1 = Normal
+            is_anomaly = bool(pred[0] == -1)
+            
+            # Generate diagnostic text summary
             overall_status = "Warning" if is_anomaly else "Normal"
             if is_anomaly:
-                if avg_hr > 120 or avg_hr < 50:
+                if avg_hr > 100 or avg_hr < 55:
                     summary_text = f"Abnormal heart rate detected: {avg_hr:.0f} BPM. Rest recommended."
-                elif avg_spo2 < 94:
-                    summary_text = f"Low blood oxygen: {avg_spo2:.0f}%. Please sit down."
+                elif avg_spo2 < 95:
+                    summary_text = f"Low blood oxygen levels detected: {avg_spo2:.0f}%. Please sit down."
                 else:
-                    summary_text = "Anomaly pattern detected. Keep calm and rest."
+                    summary_text = "Anomaly pattern detected in biometric telemetry. Keep calm and rest."
             else:
-                summary_text = f"Vitals look good. HR: {avg_hr:.0f} BPM, SpO2: {avg_spo2:.0f}%."
-
-
+                summary_text = "Your vitals are looking good."
             
         timestamp = readings[0].get('timestamp') if readings[0].get('timestamp') else None
         # Use current time if none provided
@@ -244,7 +221,6 @@ def handler(event, context):
             'signalQuality': float_to_decimal(0.98),
             'activityLabel': activity_label,
             'steps': int(steps),
-            'fingerDetected': finger_detected,
             'isAnomaly': is_anomaly,
             'overallStatus': overall_status,
             'summary': summary_text

@@ -87,6 +87,33 @@ class DashboardScreen extends StatelessWidget {
 
   // ── Step helpers ──────────────────────────────────────────────────────────
 
+  int _calculateStepsForSamples(List<TelemetrySample> daySamples) {
+    if (daySamples.isEmpty) return 0;
+
+    // Sort chronologically (oldest first)
+    final sorted = List<TelemetrySample>.from(daySamples)
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    int total = 0;
+    int prevVal = 0;
+
+    for (int i = 0; i < sorted.length; i++) {
+      final curVal = sorted[i].stepCount;
+      if (i == 0) {
+        total = curVal;
+      } else {
+        if (curVal >= prevVal) {
+          total += (curVal - prevVal);
+        } else {
+          // Reset detected
+          total += curVal;
+        }
+      }
+      prevVal = curVal;
+    }
+    return total;
+  }
+
   int _todaySteps(List<TelemetrySample> samples) {
     final now =
         DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
@@ -95,26 +122,29 @@ class DashboardScreen extends StatelessWidget {
       final ist =
           s.timestamp.toUtc().add(const Duration(hours: 5, minutes: 30));
       return DateTime(ist.year, ist.month, ist.day) == today;
-    });
-    if (todaySamples.isEmpty) return 0;
-    return todaySamples
-        .map((s) => s.stepCount)
-        .reduce((a, b) => a > b ? a : b);
+    }).toList();
+    return _calculateStepsForSamples(todaySamples);
   }
 
   int? _sevenDayAvgSteps(List<TelemetrySample> samples) {
     if (samples.isEmpty) return null;
-    final Map<DateTime, int> dailyMax = {};
+
+    final Map<DateTime, List<TelemetrySample>> dailySamplesMap = {};
     for (final s in samples) {
       final ist =
           s.timestamp.toUtc().add(const Duration(hours: 5, minutes: 30));
       final day = DateTime(ist.year, ist.month, ist.day);
-      final prev = dailyMax[day] ?? 0;
-      if (s.stepCount > prev) dailyMax[day] = s.stepCount;
+      dailySamplesMap.putIfAbsent(day, () => []).add(s);
     }
-    if (dailyMax.length < 2) return null;
-    final total = dailyMax.values.reduce((a, b) => a + b);
-    return (total / dailyMax.length).round();
+
+    if (dailySamplesMap.isEmpty) return null;
+
+    int totalStepsSum = 0;
+    for (final daySamples in dailySamplesMap.values) {
+      totalStepsSum += _calculateStepsForSamples(daySamples);
+    }
+
+    return (totalStepsSum / dailySamplesMap.length).round();
   }
 
   // ── Alert helpers ─────────────────────────────────────────────────────────

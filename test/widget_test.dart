@@ -17,11 +17,15 @@ void main() {
       notificationService: NoopNotificationService(),
     );
 
-    await tester.pumpWidget(HealthMonitorApp(controller: controller));
-    await tester.pumpAndSettle();
+    try {
+      await tester.pumpWidget(HealthMonitorApp(controller: controller));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Dashboard'), findsWidgets);
-    expect(find.text('Today\'s summary'), findsOneWidget);
-    expect(find.text('Key vitals'), findsOneWidget);
+      expect(find.text('Dashboard'), findsWidgets);
+      expect(find.text('Today\'s summary'), findsOneWidget);
+      expect(find.text('Key vitals'), findsOneWidget);
+    } finally {
+      controller.dispose();
+    }
   });
 }

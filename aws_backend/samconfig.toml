@@ -4,7 +4,7 @@ version = 0.1
 stack_name = "health-monitor-backend"
 resolve_s3 = true
 s3_prefix = "health-monitor-backend"
-confirm_changeset = true
+confirm_changeset = false
 capabilities = "CAPABILITY_IAM"
 image_repositories = []
 parameter_overrides = "DeployColdStorage=\"false\""

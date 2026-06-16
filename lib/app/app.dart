@@ -6,7 +6,7 @@ import '../data/mock/mock_device_repository.dart';
 import '../data/api/api_insights_repository.dart';
 import '../data/mock/mock_profile_repository.dart';
 import '../data/mock/mock_reminders_repository.dart';
-import '../data/mock/mock_reports_repository.dart';
+import '../data/api/api_reports_repository.dart';
 import '../data/api/api_telemetry_repository.dart';
 import '../presentation/screens/alerts_screen.dart';
 import '../presentation/screens/entry_gate_screen.dart';
@@ -16,9 +16,10 @@ import 'theme/app_theme.dart';
 
 AppController createAppController({NotificationService? notificationService}) {
   final localStorage = LocalStorage();
+  final telemetryRepo = ApiTelemetryRepository();
   return AppController(
-    telemetryRepository: ApiTelemetryRepository(),
-    reportsRepository: MockReportsRepository(),
+    telemetryRepository: telemetryRepo,
+    reportsRepository: ApiReportsRepository(telemetryRepo),
     insightsRepository: ApiInsightsRepository(),
     alertsRepository: MockAlertsRepository(),
     remindersRepository: MockRemindersRepository(localStorage),

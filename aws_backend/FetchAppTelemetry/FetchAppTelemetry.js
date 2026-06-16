@@ -18,7 +18,7 @@ exports.handler = async (event) => {
                 ':did': deviceId
             },
             ScanIndexForward: false, // Sort descending by timestamp
-            Limit: 20
+            Limit: 3000
         };
 
         const result = await dynamo.send(new QueryCommand(params));
