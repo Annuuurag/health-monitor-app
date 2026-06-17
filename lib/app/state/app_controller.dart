@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/models/alert_event.dart';
 import '../../domain/models/app_settings.dart';
@@ -52,6 +54,7 @@ class AppController extends ChangeNotifier {
   List<InsightResult> _insights = const [];
   List<AlertEvent> _alerts = const [];
   List<MedicationReminder> _reminders = const [];
+  Map<DateTime, List<String>> _appointments = {};
   UserProfile _userProfile = UserProfile.defaults();
   DeviceProfile _deviceProfile = DeviceProfile.defaults();
   AppSettings _settings = AppSettings.defaults();
@@ -65,6 +68,7 @@ class AppController extends ChangeNotifier {
   List<InsightResult> get insights => _insights;
   List<AlertEvent> get alerts => _alerts;
   List<MedicationReminder> get reminders => _reminders;
+  Map<DateTime, List<String>> get appointments => _appointments;
   UserProfile get userProfile => _userProfile;
   DeviceProfile get deviceProfile => _deviceProfile;
   AppSettings get settings => _settings;
@@ -123,6 +127,8 @@ class AppController extends ChangeNotifier {
     _userProfile = userProfile;
     _deviceProfile = deviceProfile;
     _settings = settings;
+
+    _loadAppointments();
     _insights = insights;
     notifyListeners();
   }
@@ -278,5 +284,40 @@ class AppController extends ChangeNotifier {
   void dispose() {
     _pollingTimer?.cancel();
     super.dispose();
+  }
+
+  // ── Appointments ──────────────────────────────────────────────────────────
+
+  Future<void> _loadAppointments() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString('appointments_data');
+      if (jsonStr != null) {
+        final Map<String, dynamic> decoded = jsonDecode(jsonStr);
+        _appointments = decoded.map((key, value) {
+          return MapEntry(DateTime.parse(key), List<String>.from(value));
+        });
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error loading appointments: $e');
+    }
+  }
+
+  Future<void> addAppointment(DateTime date, String title) async {
+    final day = DateTime(date.year, date.month, date.day);
+    if (_appointments[day] == null) {
+      _appointments[day] = [];
+    }
+    _appointments[day]!.add(title);
+    notifyListeners();
+    
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final encoded = _appointments.map((key, value) => MapEntry(key.toIso8601String(), value));
+      await prefs.setString('appointments_data', jsonEncode(encoded));
+    } catch (e) {
+      debugPrint('Error saving appointments: $e');
+    }
   }
 }

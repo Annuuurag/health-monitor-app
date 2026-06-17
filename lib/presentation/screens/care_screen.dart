@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:table_calendar/table_calendar.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/state/app_controller.dart';
 import '../../app/theme/app_theme.dart';
@@ -124,46 +126,7 @@ class CareScreen extends StatelessWidget {
           const SizedBox(height: 16),
           _SectionCard(
             title: 'Medical appointments',
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.teal.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
-              ),
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark ? Colors.black26 : Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.calendar_month, color: AppColors.teal),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Dr. Sharma (Cardiology)',
-                          style: TextStyle(
-                            color: AppColors.primaryText(context),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Tomorrow, 10:00 AM',
-                          style: TextStyle(color: AppColors.secondaryText(context), fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            child: _CalendarWidget(controller: controller),
           ),
           const SizedBox(height: 16),
           _SectionCard(
@@ -178,13 +141,7 @@ class CareScreen extends StatelessWidget {
                   trailing: Switch(value: true, onChanged: (_) {}, activeThumbColor: AppColors.teal),
                 ),
                 const Divider(),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.contact_phone, color: AppColors.danger),
-                  title: Text('Emergency Contact', style: TextStyle(color: AppColors.primaryText(context))),
-                  subtitle: Text('+91-9876543210 (Dad)', style: TextStyle(color: AppColors.secondaryText(context))),
-                  trailing: TextButton(onPressed: () {}, child: const Text('Edit')),
-                ),
+                const _EmergencyContactList(),
               ],
             ),
           ),
@@ -340,6 +297,181 @@ class _PrecautionLine extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _EmergencyContactList extends StatelessWidget {
+  const _EmergencyContactList();
+
+  Future<void> _makeCall(String number) async {
+    final uri = Uri(scheme: 'tel', path: number);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('Could not launch dialer: $e');
+    }
+  }
+
+  Future<void> _sendSms(String number) async {
+    final uri = Uri(
+      scheme: 'sms',
+      path: number,
+      queryParameters: <String, String>{
+        'body': 'EMERGENCY: Fall detected by Health Monitor App! Need immediate assistance.',
+      },
+    );
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint('Could not launch SMS: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _buildContact(context, 'Ayushamn', '+916901067583'),
+        const Divider(),
+        _buildContact(context, 'Subasana', '+918822628485'),
+        const Divider(),
+        _buildContact(context, 'Tasdeeque', '+919401079809'),
+      ],
+    );
+  }
+
+  Widget _buildContact(BuildContext context, String name, String number) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.contact_phone, color: AppColors.danger),
+      title: Text(name, style: TextStyle(color: AppColors.primaryText(context))),
+      subtitle: Text(number, style: TextStyle(color: AppColors.secondaryText(context))),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.message, color: AppColors.amber),
+            onPressed: () => _sendSms(number),
+          ),
+          IconButton(
+            icon: const Icon(Icons.call, color: AppColors.teal),
+            onPressed: () => _makeCall(number),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalendarWidget extends StatefulWidget {
+  const _CalendarWidget({required this.controller});
+  final AppController controller;
+
+  @override
+  State<_CalendarWidget> createState() => _CalendarWidgetState();
+}
+
+class _CalendarWidgetState extends State<_CalendarWidget> {
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDay = _focusedDay;
+  }
+
+  List<String> _getEventsForDay(DateTime day) {
+    final normalized = DateTime(day.year, day.month, day.day);
+    return widget.controller.appointments[normalized] ?? [];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final events = _getEventsForDay(_selectedDay!);
+
+    return Column(
+      children: [
+        TableCalendar<String>(
+          firstDay: DateTime.utc(2020, 1, 1),
+          lastDay: DateTime.utc(2030, 12, 31),
+          focusedDay: _focusedDay,
+          selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+          onDaySelected: (selectedDay, focusedDay) {
+            setState(() {
+              _selectedDay = selectedDay;
+              _focusedDay = focusedDay;
+            });
+          },
+          eventLoader: _getEventsForDay,
+          calendarStyle: const CalendarStyle(
+            markerDecoration: BoxDecoration(color: AppColors.teal, shape: BoxShape.circle),
+            selectedDecoration: BoxDecoration(color: AppColors.teal, shape: BoxShape.circle),
+            todayDecoration: BoxDecoration(color: AppColors.amber, shape: BoxShape.circle),
+          ),
+          headerStyle: HeaderStyle(
+            formatButtonVisible: false,
+            titleCentered: true,
+            titleTextStyle: TextStyle(color: AppColors.primaryText(context), fontSize: 16),
+            leftChevronIcon: Icon(Icons.chevron_left, color: AppColors.primaryText(context)),
+            rightChevronIcon: Icon(Icons.chevron_right, color: AppColors.primaryText(context)),
+          ),
+          daysOfWeekStyle: DaysOfWeekStyle(
+            weekdayStyle: TextStyle(color: AppColors.primaryText(context)),
+            weekendStyle: const TextStyle(color: AppColors.danger),
+          ),
+          startingDayOfWeek: StartingDayOfWeek.monday,
+        ),
+        const SizedBox(height: 10),
+        if (events.isNotEmpty)
+          ...events.map((e) => ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.event, color: AppColors.teal),
+            title: Text(e, style: TextStyle(color: AppColors.primaryText(context))),
+          )),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _showAddEventDialog(context),
+            icon: const Icon(Icons.add),
+            label: const Text('Add Appointment'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.teal,
+              side: const BorderSide(color: AppColors.teal),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showAddEventDialog(BuildContext context) {
+    final textController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('New Appointment'),
+        content: TextField(
+          controller: textController,
+          decoration: const InputDecoration(hintText: 'e.g. Cardiology Checkup'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              if (textController.text.isNotEmpty) {
+                widget.controller.addAppointment(_selectedDay!, textController.text.trim());
+              }
+              Navigator.pop(context);
+              setState(() {});
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
     );
   }
 }
