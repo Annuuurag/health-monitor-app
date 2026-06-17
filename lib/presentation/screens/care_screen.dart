@@ -122,6 +122,100 @@ class CareScreen extends StatelessWidget {
                   ),
           ),
           const SizedBox(height: 16),
+          _SectionCard(
+            title: 'Medical appointments',
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.teal.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.teal.withValues(alpha: 0.3)),
+              ),
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark ? Colors.black26 : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.calendar_month, color: AppColors.teal),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Dr. Sharma (Cardiology)',
+                          style: TextStyle(
+                            color: AppColors.primaryText(context),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tomorrow, 10:00 AM',
+                          style: TextStyle(color: AppColors.secondaryText(context), fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _SectionCard(
+            title: 'Emergency & SOS',
+            child: Column(
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.sensors, color: AppColors.amber),
+                  title: Text('Auto Fall Detection', style: TextStyle(color: AppColors.primaryText(context))),
+                  subtitle: Text('Uses MPU6050 to detect falls and alert contacts', style: TextStyle(color: AppColors.secondaryText(context), fontSize: 12)),
+                  trailing: Switch(value: true, onChanged: (_) {}, activeThumbColor: AppColors.teal),
+                ),
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.contact_phone, color: AppColors.danger),
+                  title: Text('Emergency Contact', style: TextStyle(color: AppColors.primaryText(context))),
+                  subtitle: Text('+91-9876543210 (Dad)', style: TextStyle(color: AppColors.secondaryText(context))),
+                  trailing: TextButton(onPressed: () {}, child: const Text('Edit')),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _SectionCard(
+            title: 'Caregiver access',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Allow your doctor or family members to securely view your AWS IoT vital stream in real-time.',
+                  style: TextStyle(color: AppColors.secondaryText(context), fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.share),
+                    label: const Text('Share Live Stream Link'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.teal,
+                      side: const BorderSide(color: AppColors.teal),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           const _SectionCard(
             title: 'Precautions',
             child: Column(

@@ -234,38 +234,49 @@ class DashboardScreen extends StatelessWidget {
     final textColor = AppColors.primaryText(context);
     final secondaryText = AppColors.secondaryText(context);
 
+    // ── Check if ESP is Online ───────────────────────────────────────────
+    final now = DateTime.now().toUtc();
+    final snapshotAge = now.difference(snapshot.timestamp.toUtc());
+    final isOnline = snapshotAge.inSeconds < 45; // 45 seconds timeout
+
     // ── Adjusted temperature ─────────────────────────────────────────────
-    final displayTemp = snapshot.bodyTempC + _tempOffset;
+    final displayTemp = isOnline ? snapshot.bodyTempC + _tempOffset : 0.0;
 
     // ── Dynamic card values ──────────────────────────────────────────────
-    final hr = snapshot.heartRateBpm;
-    final spo2 = snapshot.spo2Percent;
+    final hr = isOnline ? snapshot.heartRateBpm : 0.0;
+    final spo2 = isOnline ? snapshot.spo2Percent : 0.0;
 
     final hrColor =
         (hr > 0 && (hr < 50 || hr > 120)) ? AppColors.amber : AppColors.teal;
-    final hrFooter = hr == 0
-        ? 'No finger detected'
-        : (hr < 50 || hr > 120)
-            ? 'Status: Abnormal'
-            : 'Status: Normal';
+    final hrFooter = !isOnline
+        ? 'Device offline'
+        : hr == 0
+            ? 'No finger detected'
+            : (hr < 50 || hr > 120)
+                ? 'Status: Abnormal'
+                : 'Status: Normal';
 
     final spo2Color =
         (spo2 > 0 && spo2 < 94) ? AppColors.amber : AppColors.teal;
-    final spo2Footer = spo2 == 0
-        ? 'No finger detected'
-        : spo2 < 94
-            ? 'Status: Low'
-            : 'Status: Normal';
+    final spo2Footer = !isOnline
+        ? 'Device offline'
+        : spo2 == 0
+            ? 'No finger detected'
+            : spo2 < 94
+                ? 'Status: Low'
+                : 'Status: Normal';
 
     final tempColor =
-        (displayTemp < 35.5 || displayTemp > 38.0)
+        (!isOnline || displayTemp < 35.5 || displayTemp > 38.0)
             ? AppColors.amber
             : AppColors.teal;
-    final tempFooter = displayTemp > 38.0
-        ? 'Status: Fever'
-        : displayTemp < 35.5
-            ? 'Status: Low'
-            : 'Status: Normal';
+    final tempFooter = !isOnline
+        ? 'Device offline'
+        : displayTemp > 38.0
+            ? 'Status: Fever'
+            : displayTemp < 35.5
+                ? 'Status: Low'
+                : 'Status: Normal';
 
     // ── Health score ─────────────────────────────────────────────────────
     final healthScore = _calcHealthScore(
@@ -284,7 +295,11 @@ class DashboardScreen extends StatelessWidget {
     final Color summaryBadgeColor;
     final String derivedSummary;
 
-    if (healthScore == null) {
+    if (!isOnline) {
+      derivedStatus = 'Offline';
+      summaryBadgeColor = Colors.grey;
+      derivedSummary = 'Wearable is disconnected or powered off.';
+    } else if (healthScore == null) {
       derivedStatus = snapshot.overallStatus;
       summaryBadgeColor = Colors.grey;
       derivedSummary = snapshot.summary;
@@ -420,7 +435,7 @@ class DashboardScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Activity: ${snapshot.activityLabel}',
+                        'Activity: ${!isOnline ? 'Offline' : snapshot.activityLabel}',
                         style: TextStyle(color: secondaryText),
                       ),
                       Text(

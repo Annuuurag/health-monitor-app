@@ -35,7 +35,12 @@ class ApiReportsRepository implements ReportsRepository {
       return DateTime(ist.year, ist.month, ist.day) == todayDate;
     }).toList();
 
-    // Fallback if no samples exist for today: take the 5 most recent samples
+    // Calculate actual ESP active time for TODAY before falling back to recent samples
+    int dailyActiveMinutes = (dailySamples.isNotEmpty) 
+        ? (dailySamples.length * 1.5 / 60.0).round()
+        : 0;
+
+    // Fallback if no samples exist for today: take the 5 most recent samples (just to show averages)
     if (dailySamples.isEmpty) {
       dailySamples = samples.take(5).toList();
     }
@@ -66,11 +71,6 @@ class ApiReportsRepository implements ReportsRepository {
     final dailyAvgHr = dailyHrCount > 0 ? dailyHrSum / dailyHrCount : 78.4;
     final dailyAvgSpo2 = dailySpo2Count > 0 ? dailySpo2Sum / dailySpo2Count : 96.7;
     final dailyAvgTemp = dailyTempCount > 0 ? dailyTempSum / dailyTempCount : 36.8;
-
-    // Calculate actual ESP active time (each sample is 1.5 seconds of activity)
-    int dailyActiveMinutes = (dailySamples.isNotEmpty) 
-        ? (dailySamples.length * 1.5 / 60.0).round().clamp(1, 100000)
-        : 0;
 
     // Dynamic Daily Note based on actual averages and alerts
     String dailyNote = "All daily biometric readings are within healthy baseline limits.";

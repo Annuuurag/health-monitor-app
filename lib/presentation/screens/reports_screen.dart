@@ -72,10 +72,10 @@ class ReportsScreen extends StatelessWidget {
 
         final steps = _calculateStepsForSamples(daySamples);
 
-        // Normalise steps (relative to a 5,000 steps daily target)
-        final double heightFactor = (steps / 5000.0).clamp(0.08, 1.0);
-        // Teal for active day (>= 2500 steps), amber for low activity
-        final color = steps >= 2500 ? AppColors.teal : AppColors.amber;
+        // Normalise steps (relative to a 500 steps daily target for testing)
+        final double heightFactor = (steps / 500.0).clamp(0.08, 1.0);
+        // Teal for active day (>= 250 steps), amber for low activity
+        final color = steps >= 250 ? AppColors.teal : AppColors.amber;
 
         String label;
         if (steps >= 1000) {
