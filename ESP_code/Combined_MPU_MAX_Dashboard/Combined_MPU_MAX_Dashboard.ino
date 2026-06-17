@@ -89,10 +89,33 @@ bool magBufferFull = false;
 
 String currentActivity = "Resting";
 int stepCount = 0;
-float stepThreshold = 1.22;  // Peak threshold for a step in g
-bool aboveThreshold = false;
-unsigned long lastStepTime = 0;
-const unsigned long minStepInterval = 300; // Minimum ms between steps
+
+// ── Proper Pedometer Algorithm ───────────────────────────
+// EMA low-pass filter (smooths raw accelerometer magnitude)
+float filteredMag    = 1.0;   // Initialised to gravity
+const float emaAlpha = 0.15;  // Smoothing factor (lower = smoother)
+
+// Dynamic baseline (running average of filtered magnitude)
+float dynamicMean       = 1.0;
+const float meanAlpha    = 0.005;  // Very slow adaptation
+const float peakDelta    = 0.12;   // Must exceed mean by this to register peak
+const float valleyDelta  = 0.06;   // Must drop below mean by this after peak
+
+// State machine: IDLE → PEAK_DETECTED → (valley confirms step)
+enum StepPhase { STEP_IDLE, STEP_PEAK_DETECTED };
+StepPhase stepPhase = STEP_IDLE;
+float peakValue     = 0;
+
+// Timing guards
+unsigned long lastStepTime       = 0;
+const unsigned long minStepInterval = 400;  // Max ~2.5 steps/sec (fast jog)
+const unsigned long maxStepInterval = 2000; // Reject if gap > 2s (not walking)
+
+// Consecutive step validation
+// Require N candidate steps in a row with consistent cadence before counting
+const int requiredConsecutive   = 4;
+int   candidateCount            = 0;    // Candidates accumulated so far
+unsigned long candidateTimestamps[4];    // Ring buffer of candidate times
 
 
 // ── MAX30102 ──────────────────────────────────────────────
@@ -409,8 +432,8 @@ void initMAX30102() {
   }
 
   particleSensor.setup(60, 4, 2, 400, 411, 4096);
-  particleSensor.setPulseAmplitudeRed(0x1F);
-  particleSensor.setPulseAmplitudeIR(0x1F);
+  particleSensor.setPulseAmplitudeRed(0x3F); // ~12.5mA (Double the default, half the max)
+  particleSensor.setPulseAmplitudeIR(0x3F);
 
   for (byte i = 0; i < BUFFER_LENGTH; i++) {
     while (!particleSensor.available())
@@ -470,28 +493,75 @@ void updateAccelerometerAndActivity() {
     lastMpuRead = millis();
     readAndPrintMPU6050();
 
-    // Calculate magnitude
+    // Calculate raw magnitude
     float mag = sqrt(g_ax * g_ax + g_ay * g_ay + g_az * g_az);
 
-    // Store in circular buffer
+    // Store in circular buffer (used for activity classification)
     magBuffer[magIndex] = mag;
     magIndex = (magIndex + 1) % MAG_BUFFER_SIZE;
     if (magIndex == 0) {
       magBufferFull = true;
     }
 
-    // Step counting (peak-detection with hysteresis)
-    if (mag > stepThreshold && !aboveThreshold) {
-      if (millis() - lastStepTime > minStepInterval) {
-        stepCount++;
-        lastStepTime = millis();
-        aboveThreshold = true;
-      }
-    } else if (mag < 1.08) {
-      aboveThreshold = false;
+    // ── EMA low-pass filter ──────────────────────────────
+    filteredMag = emaAlpha * mag + (1.0 - emaAlpha) * filteredMag;
+
+    // ── Update dynamic baseline slowly ───────────────────
+    dynamicMean = meanAlpha * filteredMag + (1.0 - meanAlpha) * dynamicMean;
+
+    // ── Step detection state machine ─────────────────────
+    float upperThresh = dynamicMean + peakDelta;
+    float lowerThresh = dynamicMean - valleyDelta;
+
+    switch (stepPhase) {
+      case STEP_IDLE:
+        // Wait for filtered magnitude to rise above the upper threshold
+        if (filteredMag > upperThresh) {
+          stepPhase = STEP_PEAK_DETECTED;
+          peakValue = filteredMag;
+        }
+        break;
+
+      case STEP_PEAK_DETECTED:
+        // Track the highest point of this peak
+        if (filteredMag > peakValue) {
+          peakValue = filteredMag;
+        }
+        // Confirm step when signal drops below the lower threshold (valley)
+        if (filteredMag < lowerThresh) {
+          unsigned long now = millis();
+          unsigned long elapsed = now - lastStepTime;
+
+          // Only consider if timing is within walking/jogging cadence
+          if (elapsed >= minStepInterval) {
+            if (elapsed <= maxStepInterval && lastStepTime > 0) {
+              // Valid cadence — count as candidate step
+              candidateTimestamps[candidateCount % requiredConsecutive] = now;
+              candidateCount++;
+
+              if (candidateCount >= requiredConsecutive) {
+                // Enough consecutive valid steps — confirm them all
+                if (candidateCount == requiredConsecutive) {
+                  // First time reaching threshold: credit the backlog
+                  stepCount += requiredConsecutive;
+                } else {
+                  // Already validated, each new candidate is a real step
+                  stepCount++;
+                }
+              }
+            } else {
+              // Gap too long or first step ever — reset candidate chain
+              candidateCount = 0;
+            }
+            lastStepTime = now;
+          }
+          // Return to idle regardless
+          stepPhase = STEP_IDLE;
+        }
+        break;
     }
 
-    // Activity classification based on peak-to-peak difference (range)
+    // ── Activity classification (unchanged logic) ────────
     float range = getMagnitudeRange();
     if (range < 0.18) {
       currentActivity = "Resting";

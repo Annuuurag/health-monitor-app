@@ -233,8 +233,6 @@ class DashboardScreen extends StatelessWidget {
 
     final textColor = AppColors.primaryText(context);
     final secondaryText = AppColors.secondaryText(context);
-    final summaryBadgeColor =
-        snapshot.isAnomaly ? AppColors.amber : AppColors.success;
 
     // ── Adjusted temperature ─────────────────────────────────────────────
     final displayTemp = snapshot.bodyTempC + _tempOffset;
@@ -280,6 +278,55 @@ class DashboardScreen extends StatelessWidget {
     final (gradeLabel, gradeColor) = healthScore == null
         ? ('No data', Colors.grey)
         : _scoreGrade(healthScore);
+
+    // ── Derive overall status from health score (consistent with circle) ─
+    final String derivedStatus;
+    final Color summaryBadgeColor;
+    final String derivedSummary;
+
+    if (healthScore == null) {
+      derivedStatus = snapshot.overallStatus;
+      summaryBadgeColor = Colors.grey;
+      derivedSummary = snapshot.summary;
+    } else if (healthScore >= 90) {
+      derivedStatus = 'Normal';
+      summaryBadgeColor = AppColors.success;
+      derivedSummary = 'Your vitals are looking good. Keep it up!';
+    } else if (healthScore >= 75) {
+      derivedStatus = 'Normal';
+      summaryBadgeColor = AppColors.success;
+      // Build helpful summary from individual concerns
+      final concerns = <String>[];
+      if (snapshot.isAnomaly) concerns.add('minor biometric irregularity');
+      if (hr > 100) concerns.add('elevated heart rate');
+      if (spo2 > 0 && spo2 < 95) concerns.add('slightly low SpO2');
+      if (displayTemp > 37.5) concerns.add('mild temperature rise');
+      derivedSummary = concerns.isEmpty
+          ? 'Your vitals are mostly normal.'
+          : 'Vitals mostly normal, but noted: ${concerns.join(", ")}.';
+    } else if (healthScore >= 60) {
+      derivedStatus = 'Caution';
+      summaryBadgeColor = AppColors.amber;
+      final concerns = <String>[];
+      if (snapshot.isAnomaly) concerns.add('anomaly pattern detected');
+      if (hr > 120 || hr < 50) concerns.add('abnormal heart rate');
+      if (spo2 > 0 && spo2 < 92) concerns.add('low blood oxygen');
+      if (displayTemp > 38.0) concerns.add('fever detected');
+      derivedSummary = concerns.isEmpty
+          ? 'Some vitals need attention. Monitor closely.'
+          : 'Needs attention: ${concerns.join(", ")}. Rest recommended.';
+    } else {
+      derivedStatus = 'Warning';
+      summaryBadgeColor = AppColors.danger;
+      final concerns = <String>[];
+      if (hr > 120 || hr < 50) concerns.add('abnormal heart rate (${hr.round()} BPM)');
+      if (spo2 > 0 && spo2 < 92) concerns.add('critically low SpO2 (${spo2.round()}%)');
+      if (displayTemp > 38.0) concerns.add('high fever (${displayTemp.toStringAsFixed(1)}°C)');
+      if (snapshot.isAnomaly) concerns.add('biometric anomaly flagged');
+      derivedSummary = concerns.isEmpty
+          ? 'Multiple vitals are concerning. Seek medical advice.'
+          : '${concerns.join(". ")}. Seek medical advice.';
+    }
 
     // ── Step count ───────────────────────────────────────────────────────
     final todaySteps = _todaySteps(controller.samples);
@@ -356,7 +403,7 @@ class DashboardScreen extends StatelessWidget {
                           children: [
                             const TextSpan(text: 'Overall Status : '),
                             TextSpan(
-                              text: snapshot.overallStatus,
+                              text: derivedStatus,
                               style: TextStyle(
                                 color: summaryBadgeColor,
                                 fontWeight: FontWeight.w700,
@@ -367,7 +414,7 @@ class DashboardScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        snapshot.summary,
+                        derivedSummary,
                         style:
                             TextStyle(color: secondaryText, height: 1.35),
                       ),
