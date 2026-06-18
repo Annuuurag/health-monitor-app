@@ -95,14 +95,14 @@ int stepCount = 0;
 // The center auto-adapts to any sensor orientation/tilt.
 
 float dynamicCenter = 1.0;            // Slow-moving average of magnitude
-const float centerAlpha = 0.002;      // Very slow adaptation
-const float stepDelta   = 0.12;       // INCREASED: Must deviate by 0.12g to ignore typing noise
+const float centerAlpha = 0.005;      // Slightly faster adaptation while resting
+const float stepDelta   = 0.05;       // High sensitivity, since center is now locked during walking
 
 bool  aboveThreshold = false;
 
 // Timing guard
 unsigned long lastStepTime = 0;
-const unsigned long minStepInterval = 350;  // Max ~2.8 steps/sec
+const unsigned long minStepInterval = 250;  // Allowed up to 4 steps/sec for jogging
 
 // Smoothed activity range (EMA on the range itself)
 float smoothedRange = 0.0;
@@ -556,22 +556,18 @@ void updateAccelerometerAndActivity() {
       lastGoodMag = rawMag;
     }
 
-    // ── 5-SAMPLE MEDIAN FILTER (Bulletproof against I2C spikes) ──
-    static float m[5] = {1.0, 1.0, 1.0, 1.0, 1.0};
-    m[4] = m[3]; m[3] = m[2]; m[2] = m[1]; m[1] = m[0];
-    m[0] = rawMag;
+    // ── 3-SAMPLE MEDIAN FILTER ──
+    // A 5-sample filter was too aggressive and erased actual fast footsteps!
+    // A 3-sample filter deletes 1-sample I2C spikes but keeps real foot impacts.
+    static float m[3] = {1.0, 1.0, 1.0};
+    m[2] = m[1]; m[1] = m[0]; m[0] = rawMag;
     
-    // Copy array to sort it
-    float s[5] = {m[0], m[1], m[2], m[3], m[4]};
-    // Bubble sort (fast enough for 5 items)
-    for (int i=0; i<4; i++) {
-      for (int j=0; j<4-i; j++) { 
-        if (s[j] > s[j+1]) {
-          float t = s[j]; s[j] = s[j+1]; s[j+1] = t;
-        }
-      }
-    }
-    float medianMag = s[2]; // The middle value
+    // Sort 3 items to find median
+    float a = m[0], b = m[1], c = m[2];
+    if (a > b) { float t=a; a=b; b=t; }
+    if (b > c) { float t=b; b=c; c=t; }
+    if (a > b) { float t=a; a=b; b=t; }
+    float medianMag = b;
 
     // Apply a light smoothing filter to the cleaned median
     static float mag = 1.0;
@@ -584,8 +580,12 @@ void updateAccelerometerAndActivity() {
       magBufferFull = true;
     }
 
-    // ── Update dynamic center (very slowly) ────────────────
-    dynamicCenter = centerAlpha * mag + (1.0 - centerAlpha) * dynamicCenter;
+    // ── Update dynamic center ONLY when resting ───────────
+    // If we update this while walking, the average magnitude pulls the center upward, 
+    // causing the algorithm to miss lighter footsteps.
+    if (smoothedRange < 0.20) {
+      dynamicCenter = centerAlpha * mag + (1.0 - centerAlpha) * dynamicCenter;
+    }
 
     // ── Step detection (dynamic threshold crossing) ──────
     float upperThresh = dynamicCenter + stepDelta;
