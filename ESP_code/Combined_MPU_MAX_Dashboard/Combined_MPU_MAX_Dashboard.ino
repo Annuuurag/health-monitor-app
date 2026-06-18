@@ -82,7 +82,7 @@ float g_gx, g_gy, g_gz;
 float g_temp;
 
 // ── Edge Activity Classifier & Step Counter Globals ──────
-#define MAG_BUFFER_SIZE 15
+#define MAG_BUFFER_SIZE 50          // ~2 seconds at 25 Hz (smoother activity)
 float magBuffer[MAG_BUFFER_SIZE];
 int magIndex = 0;
 bool magBufferFull = false;
@@ -90,32 +90,23 @@ bool magBufferFull = false;
 String currentActivity = "Resting";
 int stepCount = 0;
 
-// ── Proper Pedometer Algorithm ───────────────────────────
-// EMA low-pass filter (smooths raw accelerometer magnitude)
-float filteredMag    = 1.0;   // Initialised to gravity
-const float emaAlpha = 0.15;  // Smoothing factor (lower = smoother)
+// ── Simplified Pedometer (Demo-Friendly) ─────────────────
+// Uses a slow-adapting center point and raw magnitude crossings.
+// The center auto-adapts to any sensor orientation/tilt.
 
-// Dynamic baseline (running average of filtered magnitude)
-float dynamicMean       = 1.0;
-const float meanAlpha    = 0.005;  // Very slow adaptation
-const float peakDelta    = 0.12;   // Must exceed mean by this to register peak
-const float valleyDelta  = 0.06;   // Must drop below mean by this after peak
+float dynamicCenter = 1.0;            // Slow-moving average of magnitude
+const float centerAlpha = 0.002;      // Very slow adaptation
+const float stepDelta   = 0.12;       // INCREASED: Must deviate by 0.12g to ignore typing noise
 
-// State machine: IDLE → PEAK_DETECTED → (valley confirms step)
-enum StepPhase { STEP_IDLE, STEP_PEAK_DETECTED };
-StepPhase stepPhase = STEP_IDLE;
-float peakValue     = 0;
+bool  aboveThreshold = false;
 
-// Timing guards
-unsigned long lastStepTime       = 0;
-const unsigned long minStepInterval = 400;  // Max ~2.5 steps/sec (fast jog)
-const unsigned long maxStepInterval = 2000; // Reject if gap > 2s (not walking)
+// Timing guard
+unsigned long lastStepTime = 0;
+const unsigned long minStepInterval = 350;  // Max ~2.8 steps/sec
 
-// Consecutive step validation
-// Require N candidate steps in a row with consistent cadence before counting
-const int requiredConsecutive   = 4;
-int   candidateCount            = 0;    // Candidates accumulated so far
-unsigned long candidateTimestamps[4];    // Ring buffer of candidate times
+// Smoothed activity range (EMA on the range itself)
+float smoothedRange = 0.0;
+const float rangeAlpha = 0.1;  // Smoothing for activity classification
 
 
 // ── MAX30102 ──────────────────────────────────────────────
@@ -337,11 +328,39 @@ const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
       </div>
     </div>
 
+    <!-- Debug Panel -->
+    <div class="card full" style="border: 1px solid #ff8800;">
+      <div class="card-title" style="color: #ff8800;">🔧 Debug Telemetry</div>
+      <div class="row3">
+        <div class="mini">
+          <div class="label">Magnitude</div>
+          <div class="val" id="dbg_mag" style="color: #ffaa44;">--</div>
+        </div>
+        <div class="mini">
+          <div class="label">Center</div>
+          <div class="val" id="dbg_center" style="color: #ffaa44;">--</div>
+        </div>
+        <div class="mini">
+          <div class="label">Smoothed Range</div>
+          <div class="val" id="dbg_srange" style="color: #ffaa44;">--</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <textarea id="logBox" readonly style="width:100%;height:150px;background:#0a0a14;color:#88ff88;border:1px solid #333;border-radius:8px;padding:8px;font-family:monospace;font-size:0.7rem;resize:vertical;"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button onclick="copyLog()" style="flex:1;padding:8px;background:#ff8800;color:#000;border:none;border-radius:8px;font-weight:700;cursor:pointer;">📋 Copy Log</button>
+          <button onclick="clearLog()" style="flex:1;padding:8px;background:#333;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">🗑 Clear</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <p class="footer">ESP32-C3 · MPU6050 + MAX30102</p>
 
   <script>
+    let logLines = [];
+
     async function fetchData() {
       try {
         const res = await fetch('/data');
@@ -358,6 +377,17 @@ const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
         document.getElementById('gz').textContent   = d.gz;
         document.getElementById('activity').textContent = d.activityLabel;
         document.getElementById('steps').textContent    = d.steps;
+        document.getElementById('dbg_mag').textContent   = d.dbg_mag;
+        document.getElementById('dbg_center').textContent = d.dbg_center;
+        document.getElementById('dbg_srange').textContent = d.dbg_srange;
+
+        // Append to log
+        const line = 'mag=' + d.dbg_mag + '  center=' + d.dbg_center + '  sRange=' + d.dbg_srange + '  act=' + d.activityLabel + '  steps=' + d.steps;
+        logLines.push(line);
+        if (logLines.length > 200) logLines.shift();
+        const box = document.getElementById('logBox');
+        box.value = logLines.join('\n');
+        box.scrollTop = box.scrollHeight;
 
         const badge = document.getElementById('finger-badge');
         if (d.finger) {
@@ -368,6 +398,22 @@ const char DASHBOARD_HTML[] PROGMEM = R"rawliteral(
           badge.className    = 'finger-badge finger-off';
         }
       } catch(e) { console.log('fetch error', e); }
+    }
+
+    function copyLog() {
+      const box = document.getElementById('logBox');
+      box.select();
+      try {
+        document.execCommand('copy');
+        alert('Log copied to clipboard!');
+      } catch (err) {
+        alert('Could not copy automatically. Please select the text and copy manually.');
+      }
+    }
+
+    function clearLog() {
+      logLines = [];
+      document.getElementById('logBox').value = '';
     }
 
     fetchData();
@@ -395,7 +441,10 @@ void handleData() {
   json += "\"spo2Avg\":" + String(spo2Avg) + ",";
   json += "\"finger\":"  + String(fingerDetected ? "true" : "false") + ",";
   json += "\"activityLabel\":\"" + currentActivity + "\",";
-  json += "\"steps\":"   + String(stepCount);
+  json += "\"steps\":"   + String(stepCount) + ",";
+  json += "\"dbg_mag\":"   + String(sqrt(g_ax*g_ax + g_ay*g_ay + g_az*g_az), 3) + ",";
+  json += "\"dbg_center\":" + String(dynamicCenter, 3) + ",";
+  json += "\"dbg_srange\":" + String(smoothedRange, 3);
   json += "}";
   server.send(200, "application/json", json);
 }
@@ -456,23 +505,23 @@ void readAndPrintMPU6050() {
   Wire.beginTransmission(MPU);
   Wire.write(0x3B);
   Wire.endTransmission(false);
-  Wire.requestFrom(MPU, (size_t)14, true);
+  if (Wire.requestFrom(MPU, (size_t)14, true) == 14) {
+    int16_t AcX = (Wire.read() << 8) | Wire.read();
+    int16_t AcY = (Wire.read() << 8) | Wire.read();
+    int16_t AcZ = (Wire.read() << 8) | Wire.read();
+    int16_t Tmp = (Wire.read() << 8) | Wire.read();
+    int16_t GyX = (Wire.read() << 8) | Wire.read();
+    int16_t GyY = (Wire.read() << 8) | Wire.read();
+    int16_t GyZ = (Wire.read() << 8) | Wire.read();
 
-  int16_t AcX = (Wire.read() << 8) | Wire.read();
-  int16_t AcY = (Wire.read() << 8) | Wire.read();
-  int16_t AcZ = (Wire.read() << 8) | Wire.read();
-  int16_t Tmp = (Wire.read() << 8) | Wire.read();
-  int16_t GyX = (Wire.read() << 8) | Wire.read();
-  int16_t GyY = (Wire.read() << 8) | Wire.read();
-  int16_t GyZ = (Wire.read() << 8) | Wire.read();
-
-  g_ax   = AcX / 16384.0;
-  g_ay   = AcY / 16384.0;
-  g_az   = AcZ / 16384.0;
-  g_gx   = GyX / 131.0;
-  g_gy   = GyY / 131.0;
-  g_gz   = GyZ / 131.0;
-  g_temp = (Tmp / 340.0) + 36.53;
+    g_ax   = AcX / 16384.0;
+    g_ay   = AcY / 16384.0;
+    g_az   = AcZ / 16384.0;
+    g_gx   = GyX / 131.0;
+    g_gy   = GyY / 131.0;
+    g_gz   = GyZ / 131.0;
+    g_temp = (Tmp / 340.0) + 36.53;
+  }
 }
 
 float getMagnitudeRange() {
@@ -494,7 +543,39 @@ void updateAccelerometerAndActivity() {
     readAndPrintMPU6050();
 
     // Calculate raw magnitude
-    float mag = sqrt(g_ax * g_ax + g_ay * g_ay + g_az * g_az);
+    float rawMag = sqrt(g_ax * g_ax + g_ay * g_ay + g_az * g_az);
+
+    // ── SANITY FILTER: Replace corrupted I2C reads ───────
+    // If we receive a physically impossible value (like 0.25g or 4.0g) 
+    // due to I2C noise, we DO NOT return (which would freeze the pedometer).
+    // Instead, we replace it with the last known good reading.
+    static float lastGoodMag = 1.0;
+    if (rawMag < 0.5 || rawMag > 2.5) {
+      rawMag = lastGoodMag;
+    } else {
+      lastGoodMag = rawMag;
+    }
+
+    // ── 5-SAMPLE MEDIAN FILTER (Bulletproof against I2C spikes) ──
+    static float m[5] = {1.0, 1.0, 1.0, 1.0, 1.0};
+    m[4] = m[3]; m[3] = m[2]; m[2] = m[1]; m[1] = m[0];
+    m[0] = rawMag;
+    
+    // Copy array to sort it
+    float s[5] = {m[0], m[1], m[2], m[3], m[4]};
+    // Bubble sort (fast enough for 5 items)
+    for (int i=0; i<4; i++) {
+      for (int j=0; j<4-i; j++) { 
+        if (s[j] > s[j+1]) {
+          float t = s[j]; s[j] = s[j+1]; s[j+1] = t;
+        }
+      }
+    }
+    float medianMag = s[2]; // The middle value
+
+    // Apply a light smoothing filter to the cleaned median
+    static float mag = 1.0;
+    mag = 0.6 * medianMag + 0.4 * mag;
 
     // Store in circular buffer (used for activity classification)
     magBuffer[magIndex] = mag;
@@ -503,72 +584,44 @@ void updateAccelerometerAndActivity() {
       magBufferFull = true;
     }
 
-    // ── EMA low-pass filter ──────────────────────────────
-    filteredMag = emaAlpha * mag + (1.0 - emaAlpha) * filteredMag;
+    // ── Update dynamic center (very slowly) ────────────────
+    dynamicCenter = centerAlpha * mag + (1.0 - centerAlpha) * dynamicCenter;
 
-    // ── Update dynamic baseline slowly ───────────────────
-    dynamicMean = meanAlpha * filteredMag + (1.0 - meanAlpha) * dynamicMean;
+    // ── Step detection (dynamic threshold crossing) ──────
+    float upperThresh = dynamicCenter + stepDelta;
+    float lowerThresh = dynamicCenter - stepDelta;
 
-    // ── Step detection state machine ─────────────────────
-    float upperThresh = dynamicMean + peakDelta;
-    float lowerThresh = dynamicMean - valleyDelta;
-
-    switch (stepPhase) {
-      case STEP_IDLE:
-        // Wait for filtered magnitude to rise above the upper threshold
-        if (filteredMag > upperThresh) {
-          stepPhase = STEP_PEAK_DETECTED;
-          peakValue = filteredMag;
-        }
-        break;
-
-      case STEP_PEAK_DETECTED:
-        // Track the highest point of this peak
-        if (filteredMag > peakValue) {
-          peakValue = filteredMag;
-        }
-        // Confirm step when signal drops below the lower threshold (valley)
-        if (filteredMag < lowerThresh) {
-          unsigned long now = millis();
-          unsigned long elapsed = now - lastStepTime;
-
-          // Only consider if timing is within walking/jogging cadence
-          if (elapsed >= minStepInterval) {
-            if (elapsed <= maxStepInterval && lastStepTime > 0) {
-              // Valid cadence — count as candidate step
-              candidateTimestamps[candidateCount % requiredConsecutive] = now;
-              candidateCount++;
-
-              if (candidateCount >= requiredConsecutive) {
-                // Enough consecutive valid steps — confirm them all
-                if (candidateCount == requiredConsecutive) {
-                  // First time reaching threshold: credit the backlog
-                  stepCount += requiredConsecutive;
-                } else {
-                  // Already validated, each new candidate is a real step
-                  stepCount++;
-                }
-              }
-            } else {
-              // Gap too long or first step ever — reset candidate chain
-              candidateCount = 0;
-            }
-            lastStepTime = now;
-          }
-          // Return to idle regardless
-          stepPhase = STEP_IDLE;
-        }
-        break;
+    if (!aboveThreshold && mag > upperThresh) {
+      aboveThreshold = true;
+    }
+    if (aboveThreshold && mag < lowerThresh) {
+      aboveThreshold = false;
+      unsigned long now = millis();
+      if (now - lastStepTime >= minStepInterval) {
+        stepCount++;
+        lastStepTime = now;
+        Serial.printf("[STEP] count=%d  mag=%.3f  center=%.3f\n", stepCount, mag, dynamicCenter);
+      }
     }
 
-    // ── Activity classification (unchanged logic) ────────
+    // ── Activity classification (smoothed range) ─────────
     float range = getMagnitudeRange();
-    if (range < 0.18) {
+    smoothedRange = rangeAlpha * range + (1.0 - rangeAlpha) * smoothedRange;
+    
+    if (smoothedRange < 0.20) {
       currentActivity = "Resting";
-    } else if (range < 0.60) {
+    } else if (smoothedRange < 0.50) {
       currentActivity = "Walking";
     } else {
       currentActivity = "Jogging";
+    }
+
+    // Debug output every 500ms
+    static unsigned long lastDebug = 0;
+    if (millis() - lastDebug >= 500) {
+      lastDebug = millis();
+      Serial.printf("[DEBUG] mag=%.3f  center=%.3f  upper=%.3f  lower=%.3f  sRange=%.3f  activity=%s  steps=%d\n",
+                    mag, dynamicCenter, upperThresh, lowerThresh, smoothedRange, currentActivity.c_str(), stepCount);
     }
   }
 }
@@ -582,8 +635,16 @@ void setup() {
   Wire.begin(SDA_PIN, SCL_PIN);
   Wire.setClock(100000);
 
-  initMPU6050();
+  // Initialize MAX30102 FIRST because its library calls Wire.begin() 
+  // internally, which resets the I2C bus state.
   initMAX30102();
+  
+  // FORCE the I2C bus back to our chosen pins
+  Wire.begin(SDA_PIN, SCL_PIN);
+  Wire.setClock(400000); // 400kHz Fast Mode
+
+  // Initialize MPU6050 SECOND so its wake-up command isn't erased
+  initMPU6050();
 
   // ── Connect to WiFi ───────────────────────────────────
   WiFi.begin(ssid, password);

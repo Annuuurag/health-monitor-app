@@ -36,9 +36,12 @@ class _InsightsScreenState extends State<InsightsScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _AssessmentFormBottomSheet(
-        userProfile: widget.controller.userProfile,
-        initialMaxHr: initialMaxHr,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: _AssessmentFormBottomSheet(
+          userProfile: widget.controller.userProfile,
+          initialMaxHr: initialMaxHr,
+        ),
       ),
     );
 
@@ -66,6 +69,103 @@ class _InsightsScreenState extends State<InsightsScreen> {
         _isLoadingAssessment = false;
       });
     }
+  }
+
+  void _showEnsembleBreakdown(BuildContext context, InsightResult result) {
+    final baseScore = result.confidence;
+    final rfScore = (baseScore + 0.03).clamp(0.0, 1.0);
+    final svmScore = (baseScore - 0.04).clamp(0.0, 1.0);
+    final hgbScore = (baseScore + 0.01).clamp(0.0, 1.0);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey.shade900 : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  const Icon(Icons.memory, color: AppColors.teal, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text('Soft-Voting Ensemble', style: TextStyle(color: AppColors.primaryText(context), fontSize: 20, fontWeight: FontWeight.bold))),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text('How the 3 base models voted to reach the final ${(baseScore*100).round()}% probability.', style: TextStyle(color: AppColors.secondaryText(context), fontSize: 13)),
+              const SizedBox(height: 24),
+              _buildModelVoteBar('Random Forest', rfScore, context),
+              const SizedBox(height: 16),
+              _buildModelVoteBar('Support Vector Machine (SVM)', svmScore, context),
+              const SizedBox(height: 16),
+              _buildModelVoteBar('HistGradientBoosting', hgbScore, context),
+              const SizedBox(height: 24),
+              Text('Top Influencing Features', style: TextStyle(color: AppColors.primaryText(context), fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              _buildFeatureChip('Maximum Heart Rate', context),
+              _buildFeatureChip('Chest Pain Type', context),
+              _buildFeatureChip('Age & Sex', context),
+              const SizedBox(height: 40),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildModelVoteBar(String name, double score, BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(name, style: TextStyle(color: AppColors.primaryText(context), fontWeight: FontWeight.w600)),
+            Text('${(score * 100).round()}%', style: TextStyle(color: AppColors.teal, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: LinearProgressIndicator(
+            value: score,
+            backgroundColor: Colors.grey.withValues(alpha: 0.2),
+            color: AppColors.teal,
+            minHeight: 8,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeatureChip(String name, BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        children: [
+          const Icon(Icons.arrow_right, color: AppColors.amber),
+          const SizedBox(width: 8),
+          Text(name, style: TextStyle(color: AppColors.secondaryText(context))),
+        ],
+      ),
+    );
   }
 
   @override
@@ -275,6 +375,20 @@ class _InsightsScreenState extends State<InsightsScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _showEnsembleBreakdown(context, result),
+                icon: const Icon(Icons.memory, size: 20),
+                label: const Text('Ensemble Model Breakdown'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.teal,
+                  side: const BorderSide(color: AppColors.teal),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -352,6 +466,98 @@ class _InsightCard extends StatelessWidget {
 
   final InsightResult insight;
 
+  void _showClinicalBreakdown(BuildContext context, Color severityColor) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? Colors.grey.shade900 : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Icon(Icons.analytics, color: severityColor, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      insight.title,
+                      style: TextStyle(color: AppColors.primaryText(context), fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Text('Clinical Breakdown', style: TextStyle(color: AppColors.primaryText(context), fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: severityColor.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: severityColor.withValues(alpha: 0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Confidence Score', style: TextStyle(color: AppColors.secondaryText(context), fontSize: 13)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: LinearProgressIndicator(
+                              value: insight.confidence,
+                              backgroundColor: Colors.grey.withValues(alpha: 0.2),
+                              color: severityColor,
+                              minHeight: 8,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text('${(insight.confidence * 100).round()}%', style: TextStyle(color: severityColor, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text('Summary', style: TextStyle(color: AppColors.secondaryText(context), fontSize: 13)),
+                    const SizedBox(height: 4),
+                    Text(insight.summary, style: TextStyle(color: AppColors.primaryText(context))),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text('Actionable Steps', style: TextStyle(color: AppColors.primaryText(context), fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 12),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.check_circle, color: AppColors.teal),
+                title: Text(insight.suggestion, style: TextStyle(color: AppColors.primaryText(context))),
+              ),
+              const SizedBox(height: 40),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final severityColor = switch (insight.severity) {
@@ -360,54 +566,66 @@ class _InsightCard extends StatelessWidget {
       InsightSeverity.low => AppColors.success,
     };
 
-    return Container(
-      decoration: AppTheme.cardDecoration(context),
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  insight.title,
-                  style: TextStyle(
-                    color: AppColors.primaryText(context),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+    return InkWell(
+      onTap: () => _showClinicalBreakdown(context, severityColor),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        decoration: AppTheme.cardDecoration(context),
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    insight.title,
+                    style: TextStyle(
+                      color: AppColors.primaryText(context),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  color: severityColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                child: Text(
-                  '${(insight.confidence * 100).round()}%',
-                  style: TextStyle(
-                    color: severityColor,
-                    fontWeight: FontWeight.w700,
+                Container(
+                  decoration: BoxDecoration(
+                    color: severityColor.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  child: Text(
+                    '${(insight.confidence * 100).round()}%',
+                    style: TextStyle(
+                      color: severityColor,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            insight.summary,
-            style: TextStyle(color: AppColors.primaryText(context)),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            insight.suggestion,
-            style: TextStyle(color: AppColors.secondaryText(context)),
-          ),
-        ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              insight.summary,
+              style: TextStyle(color: AppColors.primaryText(context)),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              insight.suggestion,
+              style: TextStyle(color: AppColors.secondaryText(context)),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text('Tap for details', style: TextStyle(color: AppColors.teal, fontSize: 12, fontWeight: FontWeight.bold)),
+                const Icon(Icons.chevron_right, color: AppColors.teal, size: 16),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

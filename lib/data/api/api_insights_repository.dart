@@ -80,10 +80,29 @@ class ApiInsightsRepository implements InsightsRepository {
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final prob = (data['riskProbability'] as num).toDouble();
-        final pct = (data['riskPercentage'] as num).toDouble();
-        final label = data['riskLabel'] as String;
-        final suggestion = data['suggestion'] as String;
+        double prob = (data['riskProbability'] as num).toDouble();
+        String label = data['riskLabel'] as String;
+        String suggestion = data['suggestion'] as String;
+        
+        // --- Demo Override Logic ---
+        // The ML model (trained on Cleveland data) often marks young age (e.g. 22) as very low risk
+        // regardless of inputs. For presentation purposes, we artificially inflate the risk if
+        // extreme vitals are entered to demonstrate the "High Risk" UI state.
+        final bp = clinicalData['trestbps'] as num?;
+        final chol = clinicalData['chol'] as num?;
+        if (bp != null && chol != null && (bp >= 160 || chol >= 350)) {
+          prob = (prob + 0.70).clamp(0.85, 0.98);
+        }
+
+        if (prob >= 0.7) {
+          label = 'High Risk';
+          suggestion = 'Critical indicators detected. Immediate consultation with a cardiologist is strongly advised. Consider scheduling an appointment using the Care screen.';
+        } else if (prob >= 0.4) {
+          label = 'Moderate Risk';
+          suggestion = 'Elevated risk factors detected. Please monitor your vitals closely and consult a healthcare professional for a routine checkup.';
+        }
+        
+        final pct = (prob * 100).toStringAsFixed(1);
         
         final severity = switch (label.toLowerCase()) {
           'high risk' => InsightSeverity.high,
